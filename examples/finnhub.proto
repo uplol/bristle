@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+import "bristle.proto";
+
+message FinnhubTrade {
+  option (bristle.bristle_table) = "finnhub.trades";
+
+  string symbol = 1 [ json_name = "s" ];
+  double price = 2 [ json_name = "p" ];
+  uint64 tradeTime = 3 [ json_name = "t" ];
+  double volume = 4 [ json_name = "v" ];
+  repeated string tradeConditions = 5 [ json_name = "c" ];
+}

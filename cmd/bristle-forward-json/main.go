@@ -65,7 +65,6 @@ func (b *Batcher) RunFlusher(ctx context.Context, destination chan<- *v1.Payload
 		select {
 		case <-ticker.C:
 			batch := b.flush()
-			log.Printf("batch is %v", batch)
 			if batch != nil {
 				destination <- batch
 				log.Debug().Int("batch-size", len(batch.Body)).Msg("flusher: batch flushed to sender")
