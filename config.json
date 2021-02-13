@@ -1,0 +1,17 @@
+{
+    "bind": "localhost:8122",
+    "autobind": true,
+    "proto_descriptor_paths": [
+        "examples/"
+    ],
+    "clusters": [
+        {
+            "dsn": "http://127.0.0.1:8123/default",
+            "tables": {
+                "default.example_table": {
+                    "flush_interval": 1000
+                }
+            }
+        }
+    ]
+}

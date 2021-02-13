@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package bristle;
+option go_package = "proto/v1";
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions { string bristle_table = 50001; }
+extend google.protobuf.FieldOptions {
+  string bristle_column = 50001;
+  string bristle_clickhouse_type = 50002;
+}
+
+// A payload containing multiple proto bodies for the given descriptor type
+message Payload {
+  string type = 1;
+  repeated bytes body = 2;
+}
+
+message Empty {}
+
+message WriteBatchRequest {
+  string key = 1;
+  repeated Payload payloads = 2;
+}
+
+message WriteBatchResponse {
+  // The number of payloads that where acknowledged
+  uint64 acknowledged = 1;
+
+  // The number of payloads that where dropped
+  uint64 dropped = 2;
+}
+
+service BristleIngestService {
+  // Writes a single batch containing multiple payloads
+  rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
+
+  // Streaming write of batches containing multiple payloads
+  rpc StreamingWriteBatch(stream WriteBatchRequest) returns (Empty);
+}

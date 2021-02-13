@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+import "bristle.proto";
+import "google/protobuf/timestamp.proto";
+
+enum MessageType {
+  EMPTY = 0;
+  SMALL = 1;
+  BIG = 2;
+}
+
+message ExampleMessage {
+  option (bristle.bristle_table) = "default.example_table";
+
+  string name = 1;
+  MessageType type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  int64 value = 4;
+  map<string, string> tags = 5;
+  repeated string labels = 6;
+}

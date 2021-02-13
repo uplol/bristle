@@ -1,0 +1,4 @@
+#!/bin/sh
+
+set -xe
+protoc --go_out=plugins=grpc:. bristle.proto

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "bristle.proto";
+
+message Trade {
+  option (bristle.bristle_table) = "binance.trade_events";
+
+  string eventType = 1 [ json_name = "e" ];
+  uint64 eventTime = 2 [ json_name = "E" ];
+  string symbol = 3 [ json_name = "s" ];
+  uint64 tradeID = 4 [ json_name = "t" ];
+  double price = 5 [ json_name = "p" ];
+  double quantity = 6 [ json_name = "q" ];
+  uint64 buyOrderID = 7 [ json_name = "b" ];
+  uint64 sellOrderID = 8 [ json_name = "a" ];
+  uint64 tradeTime = 9 [ json_name = "T" ];
+  bool marketMaker = 10 [ json_name = "m" ];
+  bool M = 11 [ json_name = "M" ];
+}
