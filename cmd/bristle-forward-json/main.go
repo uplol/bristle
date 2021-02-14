@@ -115,12 +115,13 @@ func getClientConn(destination string) (*grpc.ClientConn, error) {
 func upstreamForwarder(typeName, destination string, payloads <-chan *v1.Payload) error {
 	var conn *grpc.ClientConn
 	var client v1.BristleIngestServiceClient
-	var stream v1.BristleIngestService_StreamingWriteBatchClient
 	var err error
 
 	for {
-		if conn == nil {
-			for {
+		payload := <-payloads
+
+		for {
+			for conn == nil {
 				conn, err = getClientConn(destination)
 				if err != nil {
 					log.Warn().Err(err).Msg("sender: backing off due to connection error")
@@ -128,30 +129,25 @@ func upstreamForwarder(typeName, destination string, payloads <-chan *v1.Payload
 					continue
 				}
 				client = v1.NewBristleIngestServiceClient(conn)
-
-				stream, err = client.StreamingWriteBatch(context.Background())
-				if err != nil {
-					log.Warn().Err(err).Msg("sender: backing off due to streaming error")
-					time.Sleep(time.Second)
-					continue
-				}
-				break
 			}
-		}
 
-		for {
-			select {
-			case payload := <-payloads:
-				err := stream.Send(&v1.WriteBatchRequest{
-					Payloads: []*v1.Payload{
-						payload,
-					},
-				})
-				if err != nil {
-					break
-				}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			_, err := client.WriteBatch(ctx, &v1.WriteBatchRequest{
+				Payloads: []*v1.Payload{
+					payload,
+				},
+			})
+			cancel()
+
+			if err != nil {
+				log.Warn().Err(err).Msg("sender: backing off due to send error")
+				conn.Close()
+				conn = nil
+				time.Sleep(time.Second)
 				continue
 			}
+
+			break
 		}
 	}
 }
