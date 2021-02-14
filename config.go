@@ -1,12 +1,15 @@
 package bristle
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
+
+	"google.golang.org/grpc/credentials"
 )
 
 type Config struct {
-	Bind                 string                    `json:"bind"`
+	IngestService        *IngestServiceConfig      `json:"ingest"`
 	ProtoDescriptorPaths []string                  `json:"proto_descriptor_paths"`
 	Clusters             []ClickhouseClusterConfig `json:"clusters"`
 
@@ -14,6 +17,16 @@ type Config struct {
 	//  bound to tables. This functionality searches for tables in all clusters in
 	//  the order you defined them. The first cluster to have a table will be used.
 	Autobind bool `json:"autobind"`
+}
+
+type TlsConfig struct {
+	Certificate string `json:"certificate"`
+	Key         string `json:"key"`
+}
+
+type IngestServiceConfig struct {
+	Bind string     `json:"bind"`
+	Tls  *TlsConfig `json:"tls"`
 }
 
 type ClickhouseClusterConfig struct {
@@ -85,4 +98,19 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func (i *IngestServiceConfig) GetTransportCredentials() (credentials.TransportCredentials, error) {
+	if i.Tls == nil {
+		return nil, nil
+	}
+
+	serverCert, err := tls.LoadX509KeyPair(i.Tls.Certificate, i.Tls.Key)
+	if err != nil {
+		return nil, err
+	}
+	return credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+	}), nil
 }

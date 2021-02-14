@@ -1,5 +1,7 @@
 {
-    "bind": "localhost:8122",
+    "ingest": {
+        "bind": "localhost:8122"
+    },
     "autobind": true,
     "proto_descriptor_paths": [
         "examples/"

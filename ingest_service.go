@@ -3,9 +3,9 @@ package bristle
 import (
 	"context"
 	"errors"
-	"log"
 	"net"
 
+	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -16,8 +16,8 @@ type IngestService struct {
 	server   *Server
 }
 
-func NewIngestService(bind string, server *Server) (*IngestService, error) {
-	listener, err := net.Listen("tcp", bind)
+func NewIngestService(server *Server) (*IngestService, error) {
+	listener, err := net.Listen("tcp", server.config.IngestService.Bind)
 	if err != nil {
 		return nil, err
 	}
@@ -29,8 +29,21 @@ func NewIngestService(bind string, server *Server) (*IngestService, error) {
 }
 
 func (i *IngestService) Run(ctx context.Context) {
+	opts := []grpc.ServerOption{}
+	transportCredentials, err := i.server.config.IngestService.GetTransportCredentials()
+
+	if err != nil {
+		log.Error().Err(err).Msg("ingest-service: failed to load TLS transport credentials")
+		panic(err)
+	}
+
+	if transportCredentials != nil {
+		opts = append(opts, grpc.Creds(transportCredentials))
+	}
+
 	go func() {
-		server := grpc.NewServer()
+		server := grpc.NewServer(opts...)
+
 		v1.RegisterBristleIngestServiceServer(server, i)
 		// ingestv1.RegisterIngestServiceServer(server, m)
 		go server.Serve(i.listener)

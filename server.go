@@ -40,7 +40,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	var err error
-	s.ingestService, err = NewIngestService(config.Bind, s)
+	s.ingestService, err = NewIngestService(s)
 	if err != nil {
 		return nil, err
 	}
