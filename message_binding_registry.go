@@ -94,7 +94,7 @@ func (m messageBindingRegistry) bind(cluster *ClickhouseCluster, messageType pro
 
 	m[typeName] = binding
 	log.Info().
-		Str("message", string("name")).
+		Str("message", typeName).
 		Str("table", string(fullTableName)).
 		Msg("server: successfully bound message")
 

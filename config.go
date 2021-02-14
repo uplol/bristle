@@ -59,7 +59,7 @@ type ClickhouseTableConfig struct {
 	// This setting dictates the behavior of the message buffer when its full.
 	//   "drop-oldest" will cause the oldest (by time written) messages to be dropped
 	//   "drop-newest" will cause new messages to be dropped
-	OnFull string `json:"on_full"`
+	OnFull OnFullBehavior `json:"on_full"`
 
 	// The number of writers to run. Each writer has its own set of buffers and
 	//  will back-off messages independently. Writes are distributed amongst writers
