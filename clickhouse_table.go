@@ -254,8 +254,7 @@ func getPreparedFieldValue(field *preparedField, message protoreflect.Message) (
 		} else if field.canBeNull {
 			result = nil
 		} else {
-			// Missing field that cannot be null
-			return nil, false
+			result = field.desc.Default().Interface()
 		}
 	}
 
