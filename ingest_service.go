@@ -56,7 +56,9 @@ var ErrNoMessageBindingRegistered = errors.New("no message binding registered fo
 var ErrPreparingMessage = errors.New("error occurred when preparing row values for message")
 
 func (i *IngestService) writePayload(payload *v1.Payload) error {
+	i.server.RLock()
 	binding, ok := i.server.messageBindingRegistry[payload.Type]
+	i.server.RUnlock()
 	if !ok {
 		return ErrNoMessageBindingRegistered
 	}

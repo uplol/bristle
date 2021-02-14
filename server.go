@@ -1,51 +1,45 @@
 package bristle
 
 import (
-	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
-	v1 "github.com/uplol/bristle/proto/v1"
 	"golang.org/x/net/context"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type Server struct {
-	ingestService          *IngestService
+	sync.RWMutex
+
+	configPath    string
+	ingestService *IngestService
+
+	// The following can get reloaded
+	config                 *Config
 	protoRegistry          *ProtoRegistry
 	messageBindingRegistry messageBindingRegistry
 	clusters               []*ClickhouseCluster
-	config                 *Config
+	writerGroup            *writerGroup
 }
 
-func NewServer(config *Config) (*Server, error) {
-	protoRegistry := NewProtoRegistry()
-	for _, path := range config.ProtoDescriptorPaths {
-		err := protoRegistry.RegisterPath(path)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	clusters := []*ClickhouseCluster{}
-	for _, clusterConfig := range config.Clusters {
-		clusters = append(clusters, NewClickhouseCluster(clusterConfig))
-	}
-
-	s := &Server{
-		messageBindingRegistry: make(messageBindingRegistry),
-		clusters:               clusters,
-		protoRegistry:          protoRegistry,
-		config:                 config,
-	}
-
-	var err error
-	s.ingestService, err = NewIngestService(s)
+func NewServer(configPath string) (*Server, error) {
+	config, err := LoadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.bindMessages()
+	s := &Server{
+		configPath: configPath,
+	}
+
+	err = s.reloadConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	s.ingestService, err = NewIngestService(s)
 	if err != nil {
 		return nil, err
 	}
@@ -53,137 +47,97 @@ func NewServer(config *Config) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) Run(ctx context.Context) error {
-	s.ingestService.Run(ctx)
-	log.Info().Msg("server: started ingest service")
+func (s *Server) reloadConfig(newConfig *Config) error {
+	protoRegistry := NewProtoRegistry()
+	for _, path := range newConfig.ProtoDescriptorPaths {
+		err := protoRegistry.RegisterPath(path)
+		if err != nil {
+			return err
+		}
+	}
 
-	writersDone := make(chan struct{})
-	numWriters := 0
+	clusters := []*ClickhouseCluster{}
+	for _, clusterConfig := range newConfig.Clusters {
+		clusters = append(clusters, NewClickhouseCluster(clusterConfig))
+	}
 
-	for _, cluster := range s.clusters {
+	messageBindingRegistry := make(messageBindingRegistry)
+	messageBindingRegistry.BindFromClusters(clusters, protoRegistry)
+
+	if newConfig.Autobind {
+		messageBindingRegistry.BindFromProtos(clusters, protoRegistry)
+	}
+
+	writerGroup := newWriterGroup()
+	for _, cluster := range clusters {
 		for _, table := range cluster.tables {
 			tableWriterCount := table.config.Writers
 			if tableWriterCount == 0 {
 				tableWriterCount = 1
 			}
-
 			log.Info().
 				Int("count", tableWriterCount).
 				Str("table", string(table.Name)).
 				Msg("server: starting up table writers")
 
 			for i := 0; i < tableWriterCount; i++ {
-				numWriters += 1
-				writer := NewClickhouseTableWriter(table)
-				go func() {
-					writer.Run(ctx)
-					writersDone <- struct{}{}
-				}()
-				table.writers = append(table.writers, writer)
+				writerGroup.Add(NewClickhouseTableWriter(table))
 			}
 		}
 	}
 
-	<-ctx.Done()
+	s.Lock()
+	s.config = newConfig
+	s.protoRegistry = protoRegistry
+	s.clusters = clusters
+	s.messageBindingRegistry = messageBindingRegistry
 
-	log.Info().Int("writers", numWriters).Msg("server: shutdown requested, waiting for all writers to exit")
-	for i := 0; i < numWriters; i++ {
-		<-writersDone
+	if s.writerGroup != nil {
+		go func() {
+			s.writerGroup.Close()
+		}()
 	}
-	log.Info().Msg("server: all writers have exited, goodbye")
+	s.writerGroup = writerGroup
+	defer s.Unlock()
 
 	return nil
 }
 
-func (s *Server) bindMessages() error {
-	if s.config.Autobind {
-		err := s.autobindMessages()
-		if err != nil {
-			return err
-		}
-	}
+func (s *Server) Run() error {
+	ctx, cancel := context.WithCancel(context.Background())
 
-	for _, cluster := range s.clusters {
-		for _, table := range cluster.tables {
-			for _, messageTypeName := range table.config.Messages {
-				messageType := s.protoRegistry.MessageTypes[protoreflect.FullName(messageTypeName)]
-				if messageType == nil {
-					return fmt.Errorf("message type '%v' is not registered", messageTypeName)
-				}
+	s.ingestService.Run(ctx)
+	log.Info().Msg("server: started ingest service")
 
-				err := s.BindMessage(cluster, messageType, table.Name)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+
+	go func() {
+		for {
+			sig := <-sigs
+			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
+				log.Info().Int("signal", int(syscall.SIGINT)).Msg("server: received shutdown signal")
+				cancel()
+			} else if sig == syscall.SIGHUP {
+				log.Info().Msg("server: received SIGHUP, reloading configuration...")
+
+				newConfig, err := LoadConfig(s.configPath)
 				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (s *Server) autobindMessages() error {
-	for name, messageType := range s.protoRegistry.MessageTypes {
-		messageOpts := messageType.Descriptor().Options()
-		if !proto.HasExtension(messageOpts, v1.E_BristleTable) {
-			log.Trace().
-				Str("name", string(name)).
-				Msg("server: skipping auto-registering message missing bristle_table option")
-			continue
-		}
-
-		fullTableName := ParseFullTableName(
-			proto.GetExtension(messageOpts, v1.E_BristleTable).(string),
-		)
-
-		matched := false
-		for _, cluster := range s.clusters {
-			err := s.BindMessage(cluster, messageType, fullTableName)
-			if err != nil {
-				if err == ErrNoSuchTable {
+					log.Error().Err(err).Msg("server: configuration reload encountered error on load, no action taken")
 					continue
 				}
-				return err
+
+				err = s.reloadConfig(newConfig)
+				if err != nil {
+					log.Error().Err(err).Msg("server: configuration reload encountered error applying, no action taken")
+					continue
+				}
 			}
-			matched = true
-			break
 		}
+	}()
 
-		if !matched {
-			return fmt.Errorf("failed to find table %v for message %v", fullTableName, name)
-		}
-	}
-	return nil
-}
-
-func (s *Server) BindMessage(cluster *ClickhouseCluster, messageType protoreflect.MessageType, fullTableName FullTableName) error {
-	typeName := string(messageType.Descriptor().FullName())
-
-	table, err := cluster.GetTable(fullTableName)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("message", typeName).
-			Str("table", string(fullTableName)).
-			Msg("server: failed to find table in cluster")
-		return err
-	}
-
-	binding, err := table.BindMessage(messageType, table.config.MessageInstancePoolSize)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("message", typeName).
-			Str("table", string(fullTableName)).
-			Msg("server: failed to bind message to table")
-		return err
-	}
-
-	s.messageBindingRegistry[typeName] = binding
-	log.Info().
-		Str("message", string("name")).
-		Str("table", string(fullTableName)).
-		Msg("server: successfully bound message")
+	<-ctx.Done()
+	log.Info().Msg("server: exit requested, goodbye")
 
 	return nil
 }

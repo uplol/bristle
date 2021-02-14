@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -10,19 +9,11 @@ import (
 )
 
 func run(ctx *cli.Context) error {
-	config, err := bristle.LoadConfig(ctx.Path("config"))
-	if err != nil {
-		panic(err)
-	}
-
-	server, err := bristle.NewServer(config)
+	server, err := bristle.NewServer(ctx.Path("config"))
 	if err != nil {
 		return err
 	}
-
-	// serverContext, _ := context.WithCancel(context.Background())
-	// TODO: shutdown on ctrl+c / etc
-	return server.Run(context.TODO())
+	return server.Run()
 }
 
 func main() {

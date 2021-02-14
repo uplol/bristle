@@ -6,6 +6,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// Similar to a sync.Pool but is more strictly sized
 type MessageInstancePool struct {
 	sync.Mutex
 

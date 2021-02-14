@@ -1,16 +1,34 @@
 package bristle
 
 import (
-	"context"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
 
+// A group of ClickhouseTableWriter's which are managed as one unit. This allows
+//  for dynamic configuration reload by swapping the underlying writer group.
+type writerGroup struct {
+	sync.RWMutex
+
+	done    chan struct{}
+	cleanup chan struct{}
+	size    int
+}
+
 type ClickhouseTableWriter struct {
 	table       *ClickhouseTable
 	buffer      *MemoryRowBuffer
 	batchBuffer chan [][]interface{}
+}
+
+func newWriterGroup() *writerGroup {
+	return &writerGroup{
+		done:    make(chan struct{}),
+		cleanup: make(chan struct{}),
+		size:    0,
+	}
 }
 
 func NewClickhouseTableWriter(table *ClickhouseTable) *ClickhouseTableWriter {
@@ -23,7 +41,31 @@ func NewClickhouseTableWriter(table *ClickhouseTable) *ClickhouseTableWriter {
 	}
 }
 
-func (c *ClickhouseTableWriter) Run(ctx context.Context) {
+func (c *writerGroup) Add(writer *ClickhouseTableWriter) {
+	c.Lock()
+	defer c.Unlock()
+
+	writer.table.writers = append(writer.table.writers, writer)
+	c.size += 1
+	go func() {
+		writer.Run(c.done)
+		c.cleanup <- struct{}{}
+	}()
+}
+
+func (c *writerGroup) Close() {
+	c.Lock()
+	defer c.Unlock()
+
+	close(c.done)
+
+	log.Info().Int("writers", c.size).Msg("writer-group: waiting for all writers to shutdown")
+	for i := 0; i < c.size; i++ {
+		<-c.cleanup
+	}
+}
+
+func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 	go c.writer()
 
 	ticker := time.NewTicker(time.Duration(c.table.config.FlushInterval) * time.Millisecond)
@@ -36,7 +78,7 @@ func (c *ClickhouseTableWriter) Run(ctx context.Context) {
 		c.batchBuffer <- batch
 
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return
 		default:
 			continue
