@@ -132,6 +132,8 @@ func (s *Server) Run() error {
 					log.Error().Err(err).Msg("server: configuration reload encountered error applying, no action taken")
 					continue
 				}
+
+				log.Info().Msg("server: configuration reload completed")
 			}
 		}
 	}()

@@ -39,7 +39,7 @@ func (p *ProtoRegistry) RegisterFile(file protoreflect.FileDescriptor) error {
 		p.MessageTypes[message.FullName()] = dynamicpb.NewMessageType(message)
 	}
 
-	return p.Files.RegisterFile(file)
+	return nil
 }
 
 func (p *ProtoRegistry) RegisterPath(path string) error {
@@ -111,7 +111,7 @@ func (p *ProtoRegistry) FindFileByPath(path string) (protoreflect.FileDescriptor
 			}
 			return timestamppb.File_google_protobuf_timestamp_proto, nil
 		}
-	} else if path == "bristle.proto" {
+	} else if strings.HasSuffix(path, "bristle.proto") {
 		return v1.File_bristle_proto, nil
 	}
 

@@ -63,10 +63,12 @@ func (c *writerGroup) Close() {
 	for i := 0; i < c.size; i++ {
 		<-c.cleanup
 	}
+	log.Info().Msg("writer-group: all writers have shutdown, goodbye")
 }
 
 func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 	go c.writer()
+	defer close(c.batchBuffer)
 
 	ticker := time.NewTicker(time.Duration(c.table.config.FlushInterval) * time.Millisecond)
 
@@ -75,7 +77,10 @@ func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 		<-ticker.C
 
 		batch := c.buffer.FlushBatch()
-		c.batchBuffer <- batch
+		if batch != nil {
+			c.batchBuffer <- batch
+			continue
+		}
 
 		select {
 		case <-done:
@@ -84,8 +89,6 @@ func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 			continue
 		}
 	}
-
-	close(c.batchBuffer)
 }
 
 func (c *ClickhouseTableWriter) writer() {
