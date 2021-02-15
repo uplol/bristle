@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mailru/go-clickhouse"
+	"github.com/ClickHouse/clickhouse-go"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -115,6 +115,7 @@ type preparedField struct {
 
 	defaultValue    interface{}
 	defaultExpr     string
+	enumSize        int
 	isArray         bool
 	isMapKey        bool
 	isMapValue      bool
@@ -125,9 +126,16 @@ type preparedField struct {
 func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) preparedField {
 	canBeNull := strings.HasPrefix(column.Type, "Nullable(")
 	isArray := strings.HasPrefix(column.Type, "Array(")
+	enumSize := 0
+	if strings.HasPrefix(column.Type, "Enum8(") {
+		enumSize = 8
+	} else if strings.HasPrefix(column.Type, "Enum16(") {
+		enumSize = 16
+	}
 	return preparedField{
 		desc:        desc,
 		canBeNull:   canBeNull,
+		enumSize:    enumSize,
 		isArray:     isArray,
 		defaultExpr: column.Default,
 	}
@@ -135,7 +143,7 @@ func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) prepar
 
 func (t *ClickhouseTable) BindMessage(messageType protoreflect.MessageType, poolSize int) (*MessageTableBinding, error) {
 	fieldsIter := messageType.Descriptor().Fields()
-	columnCount := fieldsIter.Len()
+	columnCount := len(t.Columns)
 	columnFields := make([]preparedField, columnCount)
 	for i := 0; i < fieldsIter.Len(); i++ {
 		field := fieldsIter.Get(i)
@@ -242,16 +250,18 @@ func getPreparedFieldValue(field *preparedField, message protoreflect.Message) (
 				return true
 			})
 			result = localResult
+		} else if field.enumSize == 8 {
+			result = uint8(message.Get(field.desc).Enum())
+		} else if field.enumSize == 16 {
+			result = uint16(message.Get(field.desc).Enum())
 		} else {
 			result = message.Get(field.desc).Interface()
 		}
 	} else {
-		if field.defaultValue != nil {
-			result = field.defaultValue
-		} else if field.defaultExpr != "" {
-			return field.defaultExpr, true
-		} else if field.canBeNull {
+		if field.canBeNull {
 			result = nil
+		} else if field.isArray {
+			result = []interface{}{}
 		} else {
 			result = field.desc.Default().Interface()
 		}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	_ "github.com/mailru/go-clickhouse"
+	_ "github.com/ClickHouse/clickhouse-go"
 )
 
 type ClickhouseCluster struct {
