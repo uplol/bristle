@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -12,11 +13,19 @@ type Config struct {
 	IngestService        *IngestServiceConfig      `json:"ingest"`
 	ProtoDescriptorPaths []string                  `json:"proto_descriptor_paths"`
 	Clusters             []ClickhouseClusterConfig `json:"clusters"`
+	Debugging            *DebuggingConfig          `json:"debugging"`
+	LogLevel             string                    `json:"log_level"`
 
 	// Whether messages that contain a `bristle_table` option will be automatically
 	//  bound to tables. This functionality searches for tables in all clusters in
 	//  the order you defined them. The first cluster to have a table will be used.
 	Autobind bool `json:"autobind"`
+}
+
+type DebuggingConfig struct {
+	Bind                 string `json:"bind"`
+	BlockProfileRate     *int   `json:"block_profile_rate"`
+	MutexProfileFraction *int   `json:"mutex_profile_fraction"`
 }
 
 type TlsConfig struct {
@@ -25,8 +34,9 @@ type TlsConfig struct {
 }
 
 type IngestServiceConfig struct {
-	Bind string     `json:"bind"`
-	Tls  *TlsConfig `json:"tls"`
+	Bind                  string     `json:"bind"`
+	Tls                   *TlsConfig `json:"tls"`
+	MaxReceiveMessageSize *int       `json:"max_receive_message_size"`
 }
 
 type ClickhouseClusterConfig struct {
@@ -113,4 +123,19 @@ func (i *IngestServiceConfig) GetTransportCredentials() (credentials.TransportCr
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.NoClientCert,
 	}), nil
+}
+
+func setLogLevel(logLevel string) {
+	switch logLevel {
+	case "error":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "warn":
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case "info":
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case "debug":
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	case "trace":
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
 }

@@ -22,6 +22,7 @@ type Server struct {
 	messageBindingRegistry messageBindingRegistry
 	clusters               []*ClickhouseCluster
 	writerGroup            *writerGroup
+	debugServer            *debugServer
 }
 
 func NewServer(configPath string) (*Server, error) {
@@ -48,6 +49,11 @@ func NewServer(configPath string) (*Server, error) {
 }
 
 func (s *Server) reloadConfig(newConfig *Config) error {
+	var debugServer *debugServer
+	if newConfig.Debugging != nil {
+		debugServer = newDebugServer(*newConfig.Debugging)
+	}
+
 	protoRegistry := NewProtoRegistry()
 	for _, path := range newConfig.ProtoDescriptorPaths {
 		err := protoRegistry.RegisterPath(path)
@@ -81,23 +87,37 @@ func (s *Server) reloadConfig(newConfig *Config) error {
 				Msg("server: starting up table writers")
 
 			for i := 0; i < tableWriterCount; i++ {
-				writerGroup.Add(NewClickhouseTableWriter(table))
+				writer, err := NewClickhouseTableWriter(table)
+				if err != nil {
+					return err
+				}
+				writerGroup.Add(writer)
 			}
 		}
 	}
 
 	s.Lock()
+	if newConfig.LogLevel != "" {
+		setLogLevel(newConfig.LogLevel)
+	}
 	s.config = newConfig
 	s.protoRegistry = protoRegistry
 	s.clusters = clusters
 	s.messageBindingRegistry = messageBindingRegistry
 
+	if s.debugServer != nil {
+		s.debugServer.Close()
+	}
+	s.debugServer = debugServer
+	if debugServer != nil {
+		go s.debugServer.Run()
+	}
+
 	if s.writerGroup != nil {
-		go func() {
-			s.writerGroup.Close()
-		}()
+		go s.writerGroup.Close()
 	}
 	s.writerGroup = writerGroup
+	s.writerGroup.Start()
 	defer s.Unlock()
 
 	return nil

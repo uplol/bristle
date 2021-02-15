@@ -134,10 +134,9 @@ func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) prepar
 }
 
 func (t *ClickhouseTable) BindMessage(messageType protoreflect.MessageType, poolSize int) (*MessageTableBinding, error) {
-	columnCount := len(t.Columns)
-	columnFields := make([]preparedField, columnCount)
-
 	fieldsIter := messageType.Descriptor().Fields()
+	columnCount := fieldsIter.Len()
+	columnFields := make([]preparedField, columnCount)
 	for i := 0; i < fieldsIter.Len(); i++ {
 		field := fieldsIter.Get(i)
 

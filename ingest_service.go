@@ -30,15 +30,17 @@ func NewIngestService(server *Server) (*IngestService, error) {
 
 func (i *IngestService) Run(ctx context.Context) {
 	opts := []grpc.ServerOption{}
-	transportCredentials, err := i.server.config.IngestService.GetTransportCredentials()
 
+	transportCredentials, err := i.server.config.IngestService.GetTransportCredentials()
 	if err != nil {
 		log.Error().Err(err).Msg("ingest-service: failed to load TLS transport credentials")
 		panic(err)
+	} else if transportCredentials != nil {
+		opts = append(opts, grpc.Creds(transportCredentials))
 	}
 
-	if transportCredentials != nil {
-		opts = append(opts, grpc.Creds(transportCredentials))
+	if i.server.config.IngestService.MaxReceiveMessageSize != nil {
+		opts = append(opts, grpc.MaxRecvMsgSize(*i.server.config.IngestService.MaxReceiveMessageSize))
 	}
 
 	go func() {
@@ -109,7 +111,7 @@ func (i *IngestService) StreamingWriteBatch(ingestion v1.BristleIngestService_St
 		for _, payload := range batch.Payloads {
 			err := i.writePayload(payload)
 			if err != nil {
-				log.Printf("Failed to write payload: %v", err)
+				log.Error().Err(err).Msg("ingest-service: failed to write payload")
 				return err
 			}
 		}

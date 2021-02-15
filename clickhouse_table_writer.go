@@ -12,6 +12,7 @@ import (
 type writerGroup struct {
 	sync.RWMutex
 
+	writers []*ClickhouseTableWriter
 	done    chan struct{}
 	cleanup chan struct{}
 	size    int
@@ -25,20 +26,28 @@ type ClickhouseTableWriter struct {
 
 func newWriterGroup() *writerGroup {
 	return &writerGroup{
+		writers: make([]*ClickhouseTableWriter, 0),
 		done:    make(chan struct{}),
 		cleanup: make(chan struct{}),
 		size:    0,
 	}
 }
 
-func NewClickhouseTableWriter(table *ClickhouseTable) *ClickhouseTableWriter {
-	buffer := NewMemoryBuffer(table.config.MaxBatchSize, table.config.OnFull)
+func NewClickhouseTableWriter(table *ClickhouseTable) (*ClickhouseTableWriter, error) {
+	buffer, err := NewMemoryBuffer(
+		string(table.Name),
+		table.config.MaxBatchSize,
+		table.config.OnFull,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ClickhouseTableWriter{
 		table:       table,
 		buffer:      buffer,
 		batchBuffer: make(chan [][]interface{}, table.config.BatchBufferSize),
-	}
+	}, nil
 }
 
 func (c *writerGroup) Add(writer *ClickhouseTableWriter) {
@@ -46,11 +55,7 @@ func (c *writerGroup) Add(writer *ClickhouseTableWriter) {
 	defer c.Unlock()
 
 	writer.table.writers = append(writer.table.writers, writer)
-	c.size += 1
-	go func() {
-		writer.Run(c.done)
-		c.cleanup <- struct{}{}
-	}()
+	c.writers = append(c.writers, writer)
 }
 
 func (c *writerGroup) Close() {
@@ -59,16 +64,35 @@ func (c *writerGroup) Close() {
 
 	close(c.done)
 
-	log.Info().Int("writers", c.size).Msg("writer-group: waiting for all writers to shutdown")
-	for i := 0; i < c.size; i++ {
-		<-c.cleanup
-	}
-	log.Info().Msg("writer-group: all writers have shutdown, goodbye")
+	go func() {
+		log.Info().Int("writers", c.size).Msg("writer-group: waiting for all writers to shutdown")
+		for i := 0; i < c.size; i++ {
+			<-c.cleanup
+		}
+		log.Info().Msg("writer-group: all writers have shutdown, goodbye")
+	}()
 }
 
-func (c *ClickhouseTableWriter) Run(done chan struct{}) {
-	go c.writer()
-	defer close(c.batchBuffer)
+func (c *writerGroup) Start() {
+	c.Lock()
+	defer c.Unlock()
+
+	for _, writer := range c.writers {
+		writer.Start(c.done, c.cleanup)
+		c.size += 1
+	}
+}
+
+func (c *ClickhouseTableWriter) Start(done chan struct{}, cleanup chan struct{}) {
+	go func() {
+		c.run(done)
+		cleanup <- struct{}{}
+	}()
+}
+
+func (c *ClickhouseTableWriter) run(done chan struct{}) {
+	writerDone := make(chan struct{})
+	go c.writer(writerDone)
 
 	ticker := time.NewTicker(time.Duration(c.table.config.FlushInterval) * time.Millisecond)
 
@@ -84,6 +108,8 @@ func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 
 		select {
 		case <-done:
+			c.batchBuffer <- nil
+			<-writerDone
 			return
 		default:
 			continue
@@ -91,10 +117,12 @@ func (c *ClickhouseTableWriter) Run(done chan struct{}) {
 	}
 }
 
-func (c *ClickhouseTableWriter) writer() {
+func (c *ClickhouseTableWriter) writer(done chan struct{}) {
 	for {
-		batch, ok := <-c.batchBuffer
-		if !ok {
+		batch := <-c.batchBuffer
+		if batch == nil {
+			log.Trace().Msg("clickhouse-table-writer: close requested, goodbye!")
+			close(done)
 			return
 		}
 

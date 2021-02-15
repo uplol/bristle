@@ -1,6 +1,7 @@
 package bristle
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -18,18 +19,23 @@ var trueValue = true
 type MemoryRowBuffer struct {
 	sync.Mutex
 
+	name    string
 	maxSize int
 	onFull  OnFullBehavior
 	buffer  [][]interface{}
 }
 
-func NewMemoryBuffer(maxSize int, onFull OnFullBehavior) *MemoryRowBuffer {
-	m := &MemoryRowBuffer{
+func NewMemoryBuffer(name string, maxSize int, onFull OnFullBehavior) (*MemoryRowBuffer, error) {
+	if onFull != DropNewest && onFull != DropOldest {
+		return nil, fmt.Errorf("invalid on-full behavior '%v'", onFull)
+	}
+
+	return &MemoryRowBuffer{
+		name:    name,
 		maxSize: maxSize,
 		onFull:  onFull,
 		buffer:  make([][]interface{}, 0),
-	}
-	return m
+	}, nil
 }
 
 func (m *MemoryRowBuffer) WriteBatch(batch [][]interface{}) {
@@ -45,14 +51,13 @@ func (m *MemoryRowBuffer) WriteBatch(batch [][]interface{}) {
 			batch = batch[:m.maxSize]
 		} else if m.onFull == DropNewest {
 			batch = batch[batchSize-m.maxSize:]
-		} else {
-			// TODO: clean up these to a type / config validation
-			panic("unsupported on-full behavior: " + m.onFull)
 		}
 
 		log.Warn().
+			Str("name", m.name).
 			Str("on-full", string(m.onFull)).
 			Int("dropped", batchSize-m.maxSize).
+			Int("max-size", m.maxSize).
 			Msg("memory-buffer: batch exceeds max batch size, triggering on-full to drop extras")
 		batchSize = len(batch)
 	}
@@ -68,14 +73,14 @@ func (m *MemoryRowBuffer) WriteBatch(batch [][]interface{}) {
 		} else if m.onFull == DropNewest {
 			// Shorten the batch by enough to fit
 			batch = batch[batchSize-spareRoom:]
-		} else {
-			panic("unsupported on full behavior: " + m.onFull)
 		}
 		log.Trace().
+			Str("name", m.name).
 			Str("on-full", string(m.onFull)).
 			Int("dropped", batchSize-spareRoom).
 			Int("batch-size", batchSize).
 			Int("spare-room", spareRoom).
+			Int("max-size", m.maxSize).
 			Msg("memory-buffer: batch exceeds buffer room, triggering on-full and dropping")
 	}
 
