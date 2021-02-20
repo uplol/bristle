@@ -151,6 +151,7 @@ func (c *ClickhouseTableWriter) writeBatch(batch [][]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer stmt.Close()
 
 	for _, row := range batch {
 		_, err = stmt.Exec(
