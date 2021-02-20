@@ -6,7 +6,7 @@ export async function setup(ws: Workspace) {
     new GithubCheckRunPlugin({
       repositorySlug: "uplol/bristle",
       name: (ws: Workspace) => {
-        if (ws.task == ".ci/pipeline.ts:buildBristle") {
+        if (ws.job.task === ".ci/pipeline.ts:buildBristle") {
           return "Build & Push Bristle";
         }
 
