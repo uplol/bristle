@@ -5,6 +5,13 @@ export async function setup(ws: Workspace) {
   registerPlugin(
     new GithubCheckRunPlugin({
       repositorySlug: "uplol/bristle",
+      name: (ws: Workspace) => {
+        if (ws.task == ".ci/pipeline.ts:buildBristle") {
+          return "Build & Push Bristle";
+        }
+
+        return null; 
+      }
     })
   );
 }
