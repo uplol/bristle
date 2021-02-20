@@ -2,11 +2,14 @@ package bristle
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go"
+	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -110,32 +113,55 @@ func (t *ClickhouseTable) generateInsertQuery() error {
 
 type preparedField struct {
 	desc      protoreflect.FieldDescriptor
+	kind      protoreflect.Kind
 	canBeNull bool
 	child     *preparedField
 
 	defaultValue    interface{}
 	defaultExpr     string
-	enumSize        int
+	intSize         int
 	isArray         bool
 	isMapKey        bool
 	isMapValue      bool
 	isTimestamp     bool
+	isDateTime64    bool
 	timestampFields [2]protoreflect.FieldDescriptor
 }
 
+var (
+	enumTypeRe = regexp.MustCompile(`Enum(8|16)\(`)
+	intTypeRe  = regexp.MustCompile(`(?U)Int(8|16|32|64)\(`)
+)
+
 func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) preparedField {
+	var err error
+
 	canBeNull := strings.HasPrefix(column.Type, "Nullable(")
 	isArray := strings.HasPrefix(column.Type, "Array(")
-	enumSize := 0
-	if strings.HasPrefix(column.Type, "Enum8(") {
-		enumSize = 8
-	} else if strings.HasPrefix(column.Type, "Enum16(") {
-		enumSize = 16
+	intSize := 0
+
+	if intTypeRe.MatchString(column.Type) {
+		match := intTypeRe.FindAllStringSubmatch(column.Type, -1)
+		intSize, err = strconv.Atoi(match[0][2])
+		if err != nil {
+			panic(err)
+		}
+		if match[0][1] == "U" {
+			intSize = intSize * -1
+		}
+	} else if enumTypeRe.MatchString(column.Type) {
+		match := enumTypeRe.FindAllStringSubmatch(column.Type, -1)
+		intSize, err = strconv.Atoi(match[0][1])
+		if err != nil {
+			panic(err)
+		}
+		intSize = intSize * -1
 	}
 	return preparedField{
 		desc:        desc,
+		kind:        desc.Kind(),
 		canBeNull:   canBeNull,
-		enumSize:    enumSize,
+		intSize:     intSize,
 		isArray:     isArray,
 		defaultExpr: column.Default,
 	}
@@ -250,10 +276,79 @@ func getPreparedFieldValue(field *preparedField, message protoreflect.Message) (
 				return true
 			})
 			result = localResult
-		} else if field.enumSize == 8 {
-			result = uint8(message.Get(field.desc).Enum())
-		} else if field.enumSize == 16 {
-			result = uint16(message.Get(field.desc).Enum())
+		} else if field.intSize != 0 {
+			var i64 int64
+			var u64 uint64
+			var signed bool
+
+			if field.kind == protoreflect.EnumKind {
+				i64 = int64(message.Get(field.desc).Enum())
+				signed = true
+			} else if field.kind == protoreflect.Int32Kind ||
+				field.kind == protoreflect.Int64Kind ||
+				field.kind == protoreflect.Sint64Kind ||
+				field.kind == protoreflect.Sint32Kind {
+				i64 = message.Get(field.desc).Int()
+				signed = true
+			} else if field.kind == protoreflect.Uint32Kind || field.kind == protoreflect.Uint64Kind {
+				u64 = message.Get(field.desc).Uint()
+				signed = false
+			} else {
+				if l := log.Trace(); l.Enabled() {
+					l.Int("kind", int(field.kind)).Str("type", string(field.desc.FullName())).Msg("unsupported type for int conversion")
+				}
+				return nil, false
+			}
+
+			if field.intSize == -8 {
+				if signed {
+					result = uint8(i64)
+				} else {
+					result = uint8(u64)
+				}
+			} else if field.intSize == -16 {
+				if signed {
+					result = uint16(i64)
+				} else {
+					result = uint16(u64)
+				}
+			} else if field.intSize == -32 {
+				if signed {
+					result = uint32(i64)
+				} else {
+					result = uint32(u64)
+				}
+			} else if field.intSize == -64 {
+				if signed {
+					result = uint64(i64)
+				} else {
+					result = uint64(u64)
+				}
+			} else if field.intSize == 8 {
+				if signed {
+					result = int8(i64)
+				} else {
+					result = int8(u64)
+				}
+			} else if field.intSize == 16 {
+				if signed {
+					result = int16(i64)
+				} else {
+					result = int16(u64)
+				}
+			} else if field.intSize == 32 {
+				if signed {
+					result = int32(i64)
+				} else {
+					result = int32(u64)
+				}
+			} else if field.intSize == 64 {
+				if signed {
+					result = int64(i64)
+				} else {
+					result = int64(u64)
+				}
+			}
 		} else {
 			result = message.Get(field.desc).Interface()
 		}
