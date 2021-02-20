@@ -2,44 +2,36 @@ import { Workspace, spawnChildJob, runStep } from "runtime/core.ts";
 import { readSecrets } from "runtime/secrets.ts";
 import * as Docker from "pkg/buildy/docker@1.0/mod.ts";
 
-async function buildGoImage(ws: Workspace, project: string) {
+async function buildGoImage(ws: Workspace) {
   await Docker.buildImage({
-    tag: `bristle/${project}:${ws.sha}`,
-    dockerfilePath: `${project}/Dockerfile`,
+    tag: `bristle/bristle:${ws.sha}`,
+    dockerfilePath: `Dockerfile`,
   });
 }
 
-async function pushGoImage(ws: Workspace, project: string) {
+async function pushGoImage(ws: Workspace) {
   const [dockerHubUser, dockerHubToken] = await readSecrets(
     "DOCKER_HUB_USER",
     "DOCKER_HUB_TOKEN",
   );
 
-  await await Docker.pushImage(`bristle/${project}:${ws.sha}`, "uplol", {
-    tag: `bristle-${project}:${ws.sha}`,
+  await await Docker.pushImage(`bristle/bristle:${ws.sha}`, "uplol", {
+    tag: `bristle:${ws.sha}`,
     username: dockerHubUser,
     password: dockerHubToken,
   });
 }
 
-export async function buildGo(ws: Workspace) {
-  const project = ws.arg<string>("project");
-
-  await runStep(buildGoImage, { name: `Build ${project} Image`, args: [project]});
+export async function buildBristle(ws: Workspace) {
+  await runStep(buildGoImage, { name: `Build Bristle Image` });
   await runStep(pushGoImage, {
-    name: `Push ${project} Image`,
-    args: [project],
+    name: `Push Bristle Image`,
     skipLocal: true,
   });
 }
 
 export async function run(ws: Workspace) {
-  for (const goProject of ["ingest", "forward"]) {
-    await spawnChildJob(`.ci/pipeline.ts:buildGo`, {
-      alias: `Build ${goProject}`,
-      args: {
-        project: goProject,
-      }
-    })
-  }
+  await spawnChildJob(`.ci/pipeline.ts:buildBristle`, {
+    alias: `Build Bristle`,
+  })
 }
