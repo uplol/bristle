@@ -130,7 +130,7 @@ type preparedField struct {
 
 var (
 	enumTypeRe = regexp.MustCompile(`Enum(8|16)\(`)
-	intTypeRe  = regexp.MustCompile(`(?U)Int(8|16|32|64)\(`)
+	intTypeRe  = regexp.MustCompile(`(U)?Int(8|16|32|64)`)
 )
 
 func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) preparedField {
@@ -140,8 +140,8 @@ func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) prepar
 	isArray := strings.HasPrefix(column.Type, "Array(")
 	intSize := 0
 
-	if intTypeRe.MatchString(column.Type) {
-		match := intTypeRe.FindAllStringSubmatch(column.Type, -1)
+	match := intTypeRe.FindAllStringSubmatch(column.Type, -1)
+	if len(match) == 1 {
 		intSize, err = strconv.Atoi(match[0][2])
 		if err != nil {
 			panic(err)
@@ -149,8 +149,10 @@ func prepare(desc protoreflect.FieldDescriptor, column *ClickhouseColumn) prepar
 		if match[0][1] == "U" {
 			intSize = intSize * -1
 		}
-	} else if enumTypeRe.MatchString(column.Type) {
-		match := enumTypeRe.FindAllStringSubmatch(column.Type, -1)
+	}
+
+	match = enumTypeRe.FindAllStringSubmatch(column.Type, -1)
+	if len(match) == 1 {
 		intSize, err = strconv.Atoi(match[0][1])
 		if err != nil {
 			panic(err)
@@ -225,6 +227,12 @@ func (t *ClickhouseTable) BindMessage(messageType protoreflect.MessageType, pool
 		}
 	}
 
+	if l := log.Trace(); l.Enabled() {
+		for _, field := range columnFields {
+			l.Str("name", string(field.desc.FullName())).Interface("field", field).Msg("")
+		}
+	}
+
 	prepare := func(message protoreflect.Message) []interface{} {
 		result := make([]interface{}, columnCount)
 		var ok bool
@@ -249,110 +257,7 @@ func getPreparedFieldValue(field *preparedField, message protoreflect.Message) (
 	var err error
 	var result interface{}
 
-	if message.Has(field.desc) {
-		if field.isTimestamp {
-			seconds := message.Get(field.desc).Message().Get(field.timestampFields[0]).Int()
-			nanos := message.Get(field.desc).Message().Get(field.timestampFields[1]).Int()
-			result = time.Unix(seconds, nanos).UTC()
-		} else if field.child != nil {
-			return getPreparedFieldValue(field.child, message.Get(field.desc).Message())
-		} else if field.isMapKey {
-			fieldMap := message.Get(field.desc).Map()
-			localResult := make([]interface{}, fieldMap.Len())
-			idx := 0
-			fieldMap.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
-				localResult[idx] = key.Value().Interface()
-				idx += 1
-				return true
-			})
-			result = localResult
-		} else if field.isMapValue {
-			fieldMap := message.Get(field.desc).Map()
-			localResult := make([]interface{}, fieldMap.Len())
-			idx := 0
-			fieldMap.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
-				localResult[idx] = value.Interface()
-				idx += 1
-				return true
-			})
-			result = localResult
-		} else if field.intSize != 0 {
-			var i64 int64
-			var u64 uint64
-			var signed bool
-
-			if field.kind == protoreflect.EnumKind {
-				i64 = int64(message.Get(field.desc).Enum())
-				signed = true
-			} else if field.kind == protoreflect.Int32Kind ||
-				field.kind == protoreflect.Int64Kind ||
-				field.kind == protoreflect.Sint64Kind ||
-				field.kind == protoreflect.Sint32Kind {
-				i64 = message.Get(field.desc).Int()
-				signed = true
-			} else if field.kind == protoreflect.Uint32Kind || field.kind == protoreflect.Uint64Kind {
-				u64 = message.Get(field.desc).Uint()
-				signed = false
-			} else {
-				if l := log.Trace(); l.Enabled() {
-					l.Int("kind", int(field.kind)).Str("type", string(field.desc.FullName())).Msg("unsupported type for int conversion")
-				}
-				return nil, false
-			}
-
-			if field.intSize == -8 {
-				if signed {
-					result = uint8(i64)
-				} else {
-					result = uint8(u64)
-				}
-			} else if field.intSize == -16 {
-				if signed {
-					result = uint16(i64)
-				} else {
-					result = uint16(u64)
-				}
-			} else if field.intSize == -32 {
-				if signed {
-					result = uint32(i64)
-				} else {
-					result = uint32(u64)
-				}
-			} else if field.intSize == -64 {
-				if signed {
-					result = uint64(i64)
-				} else {
-					result = uint64(u64)
-				}
-			} else if field.intSize == 8 {
-				if signed {
-					result = int8(i64)
-				} else {
-					result = int8(u64)
-				}
-			} else if field.intSize == 16 {
-				if signed {
-					result = int16(i64)
-				} else {
-					result = int16(u64)
-				}
-			} else if field.intSize == 32 {
-				if signed {
-					result = int32(i64)
-				} else {
-					result = int32(u64)
-				}
-			} else if field.intSize == 64 {
-				if signed {
-					result = int64(i64)
-				} else {
-					result = int64(u64)
-				}
-			}
-		} else {
-			result = message.Get(field.desc).Interface()
-		}
-	} else {
+	if !message.Has(field.desc) {
 		if field.canBeNull {
 			result = nil
 		} else if field.isArray {
@@ -360,6 +265,118 @@ func getPreparedFieldValue(field *preparedField, message protoreflect.Message) (
 		} else {
 			result = field.desc.Default().Interface()
 		}
+	}
+
+	messageField := message.Get(field.desc)
+	if field.isTimestamp {
+		seconds := messageField.Message().Get(field.timestampFields[0]).Int()
+		nanos := messageField.Message().Get(field.timestampFields[1]).Int()
+		result = time.Unix(seconds, nanos).UTC()
+	} else if field.child != nil {
+		return getPreparedFieldValue(field.child, messageField.Message())
+	} else if field.isMapKey {
+		fieldMap := messageField.Map()
+		localResult := make([]interface{}, fieldMap.Len())
+		idx := 0
+		fieldMap.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
+			localResult[idx] = key.Value().Interface()
+			idx += 1
+			return true
+		})
+		result = localResult
+	} else if field.isMapValue {
+		fieldMap := messageField.Map()
+		localResult := make([]interface{}, fieldMap.Len())
+		idx := 0
+		fieldMap.Range(func(key protoreflect.MapKey, value protoreflect.Value) bool {
+			localResult[idx] = value.Interface()
+			idx += 1
+			return true
+		})
+		result = localResult
+	} else if field.intSize != 0 {
+		var i64 int64
+		var u64 uint64
+		var signed bool
+
+		if field.kind == protoreflect.EnumKind {
+			i64 = int64(messageField.Enum())
+			signed = true
+		} else if field.kind == protoreflect.Int32Kind ||
+			field.kind == protoreflect.Int64Kind ||
+			field.kind == protoreflect.Sint64Kind ||
+			field.kind == protoreflect.Sint32Kind ||
+			field.kind == protoreflect.Sfixed64Kind {
+			i64 = messageField.Int()
+			signed = true
+		} else if field.kind == protoreflect.Uint32Kind || field.kind == protoreflect.Uint64Kind || field.kind == protoreflect.Fixed64Kind {
+			u64 = messageField.Uint()
+			signed = false
+		} else if field.kind == protoreflect.BoolKind {
+			v := messageField.Bool()
+			signed = false
+			u64 = 0
+			if v {
+				u64 = 1
+			}
+		} else {
+			if l := log.Trace(); l.Enabled() {
+				l.Int("kind", int(field.kind)).Str("type", string(field.desc.FullName())).Msg("unsupported type for int conversion")
+			}
+			return nil, false
+		}
+
+		if field.intSize == -8 {
+			if signed {
+				result = uint8(i64)
+			} else {
+				result = uint8(u64)
+			}
+		} else if field.intSize == -16 {
+			if signed {
+				result = uint16(i64)
+			} else {
+				result = uint16(u64)
+			}
+		} else if field.intSize == -32 {
+			if signed {
+				result = uint32(i64)
+			} else {
+				result = uint32(u64)
+			}
+		} else if field.intSize == -64 {
+			if signed {
+				result = uint64(i64)
+			} else {
+				result = uint64(u64)
+			}
+		} else if field.intSize == 8 {
+			if signed {
+				result = int8(i64)
+			} else {
+				result = int8(u64)
+			}
+		} else if field.intSize == 16 {
+			if signed {
+				result = int16(i64)
+			} else {
+				result = int16(u64)
+			}
+		} else if field.intSize == 32 {
+			if signed {
+				result = int32(i64)
+			} else {
+				result = int32(u64)
+			}
+		} else if field.intSize == 64 {
+			if signed {
+				result = int64(i64)
+			} else {
+				result = int64(u64)
+			}
+		}
+	} else {
+		result = messageField.Interface()
 	}
 
 	if field.isArray && err == nil {
