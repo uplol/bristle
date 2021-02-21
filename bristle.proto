@@ -4,6 +4,7 @@ package bristle;
 option go_package = "proto/v1";
 
 import "google/protobuf/descriptor.proto";
+import "google/protobuf/wrappers.proto";
 
 extend google.protobuf.MessageOptions { string bristle_table = 50001; }
 extend google.protobuf.FieldOptions {
@@ -11,31 +12,70 @@ extend google.protobuf.FieldOptions {
   string bristle_clickhouse_type = 50002;
 }
 
-// A payload containing multiple proto bodies for the given descriptor type
-message Payload {
+message MessageBatchRequest {
+  // The fully-qualified name of the protobuf message type for this batch
   string type = 1;
-  repeated bytes body = 2;
+
+  // A contigous byte array of length-delimited binary encoded messages
+  bytes body = 2;
+
+  // An optional single encoded message which will be used to set default values
+  //  from.
+  bytes defaults = 3;
 }
 
-message Empty {}
-
-message WriteBatchRequest {
-  string key = 1;
-  repeated Payload payloads = 2;
+enum BatchResult {
+  OK = 1;
+  ERROR = 2;
+  RETRY_LATER = 3;
 }
+
+message WriteBatchRequest { MessageBatch batch = 1; }
 
 message WriteBatchResponse {
-  // The number of payloads that where acknowledged
-  uint64 acknowledged = 1;
+  // The result of the batch write operation
+  BatchResult result = 1;
 
-  // The number of payloads that where dropped
-  uint64 dropped = 2;
+  // An optional value specifying how long
+  Int32Value backoff = 2;
+}
+
+message MessageDefaults {
+  string type = 1;
+
+  // If unset clears this will clear the defaults for the type, otherwise should
+  //  be a single binary encoded message of the type where non-scalar defaults
+  //  will be pulled from.
+  bytes defaults = 2;
+}
+
+message OpUpdateDefaults { repeated MessageDefaults defaults = 1; }
+
+message OpConfigureSendRate {
+  // The estimated or requested send rate
+  uint32 estimated_send_rate = 1;
+
+  // The estimated or requested batch size
+  uint32 estimated_batch_size = 2;
+}
+
+message Op {
+  oneof inner {
+    OpUpdateDefaults update_defaults = 1;
+    WriteBatch write_batch = 2;
+    OpConfigureSendRate configure_send_rate = 3;
+  }
+}
+
+message OpResponse {
+  oneof inner {
+    bool update_defaults = 1;
+    WriteBatchResponse write_batch = 2;
+  }
 }
 
 service BristleIngestService {
-  // Writes a single batch containing multiple payloads
-  rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
+  rpc WriteBatch(MessageBatch) returns (WriteBatchResponse);
 
-  // Streaming write of batches containing multiple payloads
-  rpc StreamingWriteBatch(stream WriteBatchRequest) returns (Empty);
+  rpc ExecuteOp(stream Op) returns (stream OpResponse);
 }
