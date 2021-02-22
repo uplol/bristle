@@ -3,6 +3,8 @@ package bristle
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 
 	"github.com/rs/zerolog/log"
@@ -57,12 +59,12 @@ func (i *IngestService) Run(ctx context.Context) {
 var ErrNoMessageBindingRegistered = errors.New("no message binding registered for that message type")
 var ErrPreparingMessage = errors.New("error occurred when preparing row values for message")
 
-func (i *IngestService) writePayload(payload *v1.Payload) error {
+func (i *IngestService) writePayload(payload *v1.Payload) v1.BatchResult {
 	i.server.RLock()
 	binding, ok := i.server.messageBindingRegistry[payload.Type]
 	i.server.RUnlock()
 	if !ok {
-		return ErrNoMessageBindingRegistered
+		return v1.BatchResult_UNK_MESSAGE
 	}
 
 	reflectMessage := binding.InstancePool.Get()
@@ -73,26 +75,25 @@ func (i *IngestService) writePayload(payload *v1.Payload) error {
 	for idx, encodedMessage := range payload.Body {
 		err := proto.Unmarshal(encodedMessage, messageInstance)
 		if err != nil {
-			return err
+			return v1.BatchResult_DECODE_ERR
 		}
 
 		row := binding.PrepareFunc(reflectMessage)
 		if row == nil {
-			return ErrPreparingMessage
+			return v1.BatchResult_TRANSCODE_ERR
 		}
 
 		batch[idx] = row
 	}
 
-	binding.Table.WriteBatch(batch)
-	return nil
+	return binding.Table.WriteBatch(batch)
 }
 
 func (i *IngestService) WriteBatch(ctx context.Context, req *v1.WriteBatchRequest) (*v1.WriteBatchResponse, error) {
 	for _, payload := range req.Payloads {
-		err := i.writePayload(payload)
-		if err != nil {
-			return nil, err
+		result := i.writePayload(payload)
+		if result != v1.BatchResult_OK {
+			return nil, fmt.Errorf("WriteBatch error code %v", result)
 		}
 	}
 	return &v1.WriteBatchResponse{
@@ -101,19 +102,20 @@ func (i *IngestService) WriteBatch(ctx context.Context, req *v1.WriteBatchReques
 	}, nil
 }
 
-func (i *IngestService) StreamingWriteBatch(ingestion v1.BristleIngestService_StreamingWriteBatchServer) error {
+func (i *IngestService) Streaming(stream v1.BristleIngestService_StreamingServer) error {
 	for {
-		batch, err := ingestion.Recv()
-		if err != nil {
+		message, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		} else if err != nil {
 			return err
 		}
 
-		for _, payload := range batch.Payloads {
-			err := i.writePayload(payload)
-			if err != nil {
-				log.Error().Err(err).Msg("ingest-service: failed to write payload")
-				return err
-			}
-		}
+		// switch innerMessage := message.Inner.(type) {
+		// case *v1.StreamingClientMessage_WriteBatch:
+		// 	innerMessage.WriteBatch
+		// }
+
+		log.Printf("message is %v", message)
 	}
 }

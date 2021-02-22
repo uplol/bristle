@@ -32,10 +32,59 @@ message WriteBatchResponse {
   uint64 dropped = 2;
 }
 
+message StreamingClientMessageWriteBatch {
+  string type = 1;
+  bytes data = 2;
+}
+
+enum BatchResult {
+  OK = 0;
+  TOO_BIG = 1;
+  FULL = 2;
+  UNK_MESSAGE = 3;
+  DECODE_ERR = 4;
+  TRANSCODE_ERR = 5;
+}
+
+message StreamingClientMessageTypeInfo { string type = 1; }
+
+message StreamingServerMessageTypeInfo {
+  string type = 1;
+  bytes descriptor = 2;
+  uint32 max_batch_size = 3;
+}
+
+message StreamingServerMessageWriteBatchResult { BatchResult result = 1; }
+
+message StreamingClientMessageUpdateDefault {
+  string type = 1;
+  bytes default = 2;
+}
+
+message StreamingServerMessageBackoff {
+  uint32 duration = 1;
+  repeated string types = 2;
+}
+
+message StreamingClientMessage {
+  oneof inner {
+    StreamingClientMessageWriteBatch write_batch = 1;
+    StreamingClientMessageUpdateDefault update_default = 2;
+  }
+}
+
+message StreamingServerMessage {
+  oneof inner {
+    StreamingServerMessageWriteBatchResult write_batch_result = 1;
+    StreamingServerMessageBackoff backoff = 2;
+  }
+}
+
 service BristleIngestService {
   // Writes a single batch containing multiple payloads
   rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
 
-  // Streaming write of batches containing multiple payloads
-  rpc StreamingWriteBatch(stream WriteBatchRequest) returns (Empty);
+  // Bi-directional streaming API
+  rpc Streaming(stream StreamingClientMessage)
+      returns (stream StreamingServerMessage);
 }

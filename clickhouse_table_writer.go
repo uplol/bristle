@@ -19,9 +19,8 @@ type writerGroup struct {
 }
 
 type ClickhouseTableWriter struct {
-	table       *ClickhouseTable
-	buffer      *MemoryRowBuffer
-	batchBuffer chan [][]interface{}
+	table  *ClickhouseTable
+	buffer *MemoryRowBuffer
 }
 
 func newWriterGroup() *writerGroup {
@@ -36,7 +35,7 @@ func newWriterGroup() *writerGroup {
 func NewClickhouseTableWriter(table *ClickhouseTable) (*ClickhouseTableWriter, error) {
 	buffer, err := NewMemoryBuffer(
 		string(table.Name),
-		table.config.MaxBatchSize,
+		table.config.MaxBufferSize,
 		table.config.OnFull,
 	)
 	if err != nil {
@@ -44,9 +43,8 @@ func NewClickhouseTableWriter(table *ClickhouseTable) (*ClickhouseTableWriter, e
 	}
 
 	return &ClickhouseTableWriter{
-		table:       table,
-		buffer:      buffer,
-		batchBuffer: make(chan [][]interface{}, table.config.BatchBufferSize),
+		table:  table,
+		buffer: buffer,
 	}, nil
 }
 
@@ -91,46 +89,25 @@ func (c *ClickhouseTableWriter) Start(done chan struct{}, cleanup chan struct{})
 }
 
 func (c *ClickhouseTableWriter) run(done chan struct{}) {
-	writerDone := make(chan struct{})
-	go c.writer(writerDone)
-
 	ticker := time.NewTicker(time.Duration(c.table.config.FlushInterval) * time.Millisecond)
 
 	running := true
 	for running {
 		<-ticker.C
 
-		batch := c.buffer.FlushBatch()
+		batch := c.buffer.FlushBatch(c.table.config.MaxBatchSize)
 		if batch != nil {
-			c.batchBuffer <- batch
-			continue
+			err := c.writeBatch(batch)
+			if err != nil {
+				log.Error().Err(err).Str("table", string(c.table.Name)).Int("batch-size", len(batch)).Msg("clickhouse-table-writer: failed to write batch")
+			}
 		}
 
 		select {
 		case <-done:
-			c.batchBuffer <- nil
-			<-writerDone
 			return
 		default:
 			continue
-		}
-	}
-}
-
-func (c *ClickhouseTableWriter) writer(done chan struct{}) {
-	for {
-		batch := <-c.batchBuffer
-		if batch == nil {
-			log.Trace().Msg("clickhouse-table-writer: close requested, goodbye!")
-			close(done)
-			return
-		}
-
-		err := c.writeBatch(batch)
-
-		// TODO: data error vs transient write error
-		if err != nil {
-			log.Error().Err(err).Int("batch-size", len(batch)).Msg("clickhouse-table-writer: failed to write batch")
 		}
 	}
 }
@@ -162,5 +139,11 @@ func (c *ClickhouseTableWriter) writeBatch(batch [][]interface{}) error {
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		// NB: for whatever reason clickhouse-go does not handle this well and
+		//  leaks connections
+		conn.Close()
+	}
+	return err
 }

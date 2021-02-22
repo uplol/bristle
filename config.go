@@ -49,16 +49,13 @@ type ClickhouseTableConfig struct {
 	// If provided this represents an explicit list of messages we will bind to.
 	Messages []string `json:"messages"`
 
-	// Describes how large of a batch we will use when writing to clickhouse. This
-	//  controls the behavior of the MemoryRowBuffer
+	// Configures the maximum possible size of a batch we will try to commit to
+	//  clickhouse.
 	MaxBatchSize int `json:"max_batch_size"`
 
-	// This controls the size of a buffer between the flush loop and the actual
-	//  writers. During Clickhouse instability the writers will back off while
-	//  attempting to write their batches. This setting will allow the specified
-	//  number of batches to queue up within the buffer. When this buffer fills
-	//  it "backs off" to the message row buffer.
-	BatchBufferSize int `json:"batch_buffer_size"`
+	// Configures the maximum buffer size. This controls the number of messages
+	//  that can sit in memory waiting to be written.
+	MaxBufferSize int `json:"max_buffer_size"`
 
 	// The interval at which we write to Clickhouse. The higher number the more
 	//  latency and potential for your message buffer to fill, however lower numbers
@@ -85,12 +82,12 @@ type ClickhouseTableConfig struct {
 
 func DefaultClickhouseTableConfig() ClickhouseTableConfig {
 	return ClickhouseTableConfig{
-		Messages:        nil,
-		MaxBatchSize:    5000,
-		BatchBufferSize: 16,
-		FlushInterval:   1000,
-		Writers:         1,
-		OnFull:          "drop-oldest",
+		Messages:      nil,
+		MaxBatchSize:  100000,
+		MaxBufferSize: 500000,
+		FlushInterval: 1000,
+		Writers:       1,
+		OnFull:        "block",
 	}
 }
 

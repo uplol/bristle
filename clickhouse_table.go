@@ -71,10 +71,9 @@ func newClickhouseTable(cluster *ClickhouseCluster, fullTableName FullTableName,
 	return table, nil
 }
 
-func (t *ClickhouseTable) WriteBatch(batch [][]interface{}) error {
+func (t *ClickhouseTable) WriteBatch(batch [][]interface{}) v1.BatchResult {
 	result := atomic.AddInt64(&t.writerIndex, 1)
-	t.writers[result%int64(len(t.writers))].buffer.WriteBatch(batch)
-	return nil
+	return t.writers[result%int64(len(t.writers))].buffer.WriteBatch(batch)
 }
 
 // Describes the binding between a message type and its destination Clickhouse table.

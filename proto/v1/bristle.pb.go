@@ -30,6 +30,64 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+type BatchResult int32
+
+const (
+	BatchResult_OK            BatchResult = 0
+	BatchResult_TOO_BIG       BatchResult = 1
+	BatchResult_FULL          BatchResult = 2
+	BatchResult_UNK_MESSAGE   BatchResult = 3
+	BatchResult_DECODE_ERR    BatchResult = 4
+	BatchResult_TRANSCODE_ERR BatchResult = 5
+)
+
+// Enum value maps for BatchResult.
+var (
+	BatchResult_name = map[int32]string{
+		0: "OK",
+		1: "TOO_BIG",
+		2: "FULL",
+		3: "UNK_MESSAGE",
+		4: "DECODE_ERR",
+		5: "TRANSCODE_ERR",
+	}
+	BatchResult_value = map[string]int32{
+		"OK":            0,
+		"TOO_BIG":       1,
+		"FULL":          2,
+		"UNK_MESSAGE":   3,
+		"DECODE_ERR":    4,
+		"TRANSCODE_ERR": 5,
+	}
+)
+
+func (x BatchResult) Enum() *BatchResult {
+	p := new(BatchResult)
+	*p = x
+	return p
+}
+
+func (x BatchResult) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BatchResult) Descriptor() protoreflect.EnumDescriptor {
+	return file_bristle_proto_enumTypes[0].Descriptor()
+}
+
+func (BatchResult) Type() protoreflect.EnumType {
+	return &file_bristle_proto_enumTypes[0]
+}
+
+func (x BatchResult) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BatchResult.Descriptor instead.
+func (BatchResult) EnumDescriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{0}
+}
+
 // A payload containing multiple proto bodies for the given descriptor type
 type Payload struct {
 	state         protoimpl.MessageState
@@ -236,6 +294,488 @@ func (x *WriteBatchResponse) GetDropped() uint64 {
 	return 0
 }
 
+type StreamingClientMessageWriteBatch struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (x *StreamingClientMessageWriteBatch) Reset() {
+	*x = StreamingClientMessageWriteBatch{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingClientMessageWriteBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingClientMessageWriteBatch) ProtoMessage() {}
+
+func (x *StreamingClientMessageWriteBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingClientMessageWriteBatch.ProtoReflect.Descriptor instead.
+func (*StreamingClientMessageWriteBatch) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *StreamingClientMessageWriteBatch) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *StreamingClientMessageWriteBatch) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type StreamingClientMessageTypeInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+}
+
+func (x *StreamingClientMessageTypeInfo) Reset() {
+	*x = StreamingClientMessageTypeInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingClientMessageTypeInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingClientMessageTypeInfo) ProtoMessage() {}
+
+func (x *StreamingClientMessageTypeInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingClientMessageTypeInfo.ProtoReflect.Descriptor instead.
+func (*StreamingClientMessageTypeInfo) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *StreamingClientMessageTypeInfo) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+type StreamingServerMessageTypeInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Type         string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Descriptor_  []byte `protobuf:"bytes,2,opt,name=descriptor,proto3" json:"descriptor,omitempty"`
+	MaxBatchSize uint32 `protobuf:"varint,3,opt,name=max_batch_size,json=maxBatchSize,proto3" json:"max_batch_size,omitempty"`
+}
+
+func (x *StreamingServerMessageTypeInfo) Reset() {
+	*x = StreamingServerMessageTypeInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingServerMessageTypeInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingServerMessageTypeInfo) ProtoMessage() {}
+
+func (x *StreamingServerMessageTypeInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingServerMessageTypeInfo.ProtoReflect.Descriptor instead.
+func (*StreamingServerMessageTypeInfo) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *StreamingServerMessageTypeInfo) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *StreamingServerMessageTypeInfo) GetDescriptor_() []byte {
+	if x != nil {
+		return x.Descriptor_
+	}
+	return nil
+}
+
+func (x *StreamingServerMessageTypeInfo) GetMaxBatchSize() uint32 {
+	if x != nil {
+		return x.MaxBatchSize
+	}
+	return 0
+}
+
+type StreamingServerMessageWriteBatchResult struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Result BatchResult `protobuf:"varint,1,opt,name=result,proto3,enum=bristle.BatchResult" json:"result,omitempty"`
+}
+
+func (x *StreamingServerMessageWriteBatchResult) Reset() {
+	*x = StreamingServerMessageWriteBatchResult{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingServerMessageWriteBatchResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingServerMessageWriteBatchResult) ProtoMessage() {}
+
+func (x *StreamingServerMessageWriteBatchResult) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingServerMessageWriteBatchResult.ProtoReflect.Descriptor instead.
+func (*StreamingServerMessageWriteBatchResult) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *StreamingServerMessageWriteBatchResult) GetResult() BatchResult {
+	if x != nil {
+		return x.Result
+	}
+	return BatchResult_OK
+}
+
+type StreamingClientMessageUpdateDefault struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Type    string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Default []byte `protobuf:"bytes,2,opt,name=default,proto3" json:"default,omitempty"`
+}
+
+func (x *StreamingClientMessageUpdateDefault) Reset() {
+	*x = StreamingClientMessageUpdateDefault{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingClientMessageUpdateDefault) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingClientMessageUpdateDefault) ProtoMessage() {}
+
+func (x *StreamingClientMessageUpdateDefault) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingClientMessageUpdateDefault.ProtoReflect.Descriptor instead.
+func (*StreamingClientMessageUpdateDefault) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *StreamingClientMessageUpdateDefault) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *StreamingClientMessageUpdateDefault) GetDefault() []byte {
+	if x != nil {
+		return x.Default
+	}
+	return nil
+}
+
+type StreamingServerMessageBackoff struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Duration uint32   `protobuf:"varint,1,opt,name=duration,proto3" json:"duration,omitempty"`
+	Types    []string `protobuf:"bytes,2,rep,name=types,proto3" json:"types,omitempty"`
+}
+
+func (x *StreamingServerMessageBackoff) Reset() {
+	*x = StreamingServerMessageBackoff{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingServerMessageBackoff) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingServerMessageBackoff) ProtoMessage() {}
+
+func (x *StreamingServerMessageBackoff) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingServerMessageBackoff.ProtoReflect.Descriptor instead.
+func (*StreamingServerMessageBackoff) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *StreamingServerMessageBackoff) GetDuration() uint32 {
+	if x != nil {
+		return x.Duration
+	}
+	return 0
+}
+
+func (x *StreamingServerMessageBackoff) GetTypes() []string {
+	if x != nil {
+		return x.Types
+	}
+	return nil
+}
+
+type StreamingClientMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Inner:
+	//	*StreamingClientMessage_WriteBatch
+	//	*StreamingClientMessage_UpdateDefault
+	Inner isStreamingClientMessage_Inner `protobuf_oneof:"inner"`
+}
+
+func (x *StreamingClientMessage) Reset() {
+	*x = StreamingClientMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingClientMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingClientMessage) ProtoMessage() {}
+
+func (x *StreamingClientMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingClientMessage.ProtoReflect.Descriptor instead.
+func (*StreamingClientMessage) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{10}
+}
+
+func (m *StreamingClientMessage) GetInner() isStreamingClientMessage_Inner {
+	if m != nil {
+		return m.Inner
+	}
+	return nil
+}
+
+func (x *StreamingClientMessage) GetWriteBatch() *StreamingClientMessageWriteBatch {
+	if x, ok := x.GetInner().(*StreamingClientMessage_WriteBatch); ok {
+		return x.WriteBatch
+	}
+	return nil
+}
+
+func (x *StreamingClientMessage) GetUpdateDefault() *StreamingClientMessageUpdateDefault {
+	if x, ok := x.GetInner().(*StreamingClientMessage_UpdateDefault); ok {
+		return x.UpdateDefault
+	}
+	return nil
+}
+
+type isStreamingClientMessage_Inner interface {
+	isStreamingClientMessage_Inner()
+}
+
+type StreamingClientMessage_WriteBatch struct {
+	WriteBatch *StreamingClientMessageWriteBatch `protobuf:"bytes,1,opt,name=write_batch,json=writeBatch,proto3,oneof"`
+}
+
+type StreamingClientMessage_UpdateDefault struct {
+	UpdateDefault *StreamingClientMessageUpdateDefault `protobuf:"bytes,2,opt,name=update_default,json=updateDefault,proto3,oneof"`
+}
+
+func (*StreamingClientMessage_WriteBatch) isStreamingClientMessage_Inner() {}
+
+func (*StreamingClientMessage_UpdateDefault) isStreamingClientMessage_Inner() {}
+
+type StreamingServerMessage struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Inner:
+	//	*StreamingServerMessage_WriteBatchResult
+	//	*StreamingServerMessage_Backoff
+	Inner isStreamingServerMessage_Inner `protobuf_oneof:"inner"`
+}
+
+func (x *StreamingServerMessage) Reset() {
+	*x = StreamingServerMessage{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_bristle_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StreamingServerMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingServerMessage) ProtoMessage() {}
+
+func (x *StreamingServerMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_bristle_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingServerMessage.ProtoReflect.Descriptor instead.
+func (*StreamingServerMessage) Descriptor() ([]byte, []int) {
+	return file_bristle_proto_rawDescGZIP(), []int{11}
+}
+
+func (m *StreamingServerMessage) GetInner() isStreamingServerMessage_Inner {
+	if m != nil {
+		return m.Inner
+	}
+	return nil
+}
+
+func (x *StreamingServerMessage) GetWriteBatchResult() *StreamingServerMessageWriteBatchResult {
+	if x, ok := x.GetInner().(*StreamingServerMessage_WriteBatchResult); ok {
+		return x.WriteBatchResult
+	}
+	return nil
+}
+
+func (x *StreamingServerMessage) GetBackoff() *StreamingServerMessageBackoff {
+	if x, ok := x.GetInner().(*StreamingServerMessage_Backoff); ok {
+		return x.Backoff
+	}
+	return nil
+}
+
+type isStreamingServerMessage_Inner interface {
+	isStreamingServerMessage_Inner()
+}
+
+type StreamingServerMessage_WriteBatchResult struct {
+	WriteBatchResult *StreamingServerMessageWriteBatchResult `protobuf:"bytes,1,opt,name=write_batch_result,json=writeBatchResult,proto3,oneof"`
+}
+
+type StreamingServerMessage_Backoff struct {
+	Backoff *StreamingServerMessageBackoff `protobuf:"bytes,2,opt,name=backoff,proto3,oneof"`
+}
+
+func (*StreamingServerMessage_WriteBatchResult) isStreamingServerMessage_Inner() {}
+
+func (*StreamingServerMessage_Backoff) isStreamingServerMessage_Inner() {}
+
 var file_bristle_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptor.MessageOptions)(nil),
@@ -297,18 +837,82 @@ var file_bristle_proto_rawDesc = []byte{
 	0x65, 0x12, 0x22, 0x0a, 0x0c, 0x61, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c, 0x65, 0x64, 0x67, 0x65,
 	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0c, 0x61, 0x63, 0x6b, 0x6e, 0x6f, 0x77, 0x6c,
 	0x65, 0x64, 0x67, 0x65, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x64, 0x72, 0x6f, 0x70, 0x70, 0x65, 0x64,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x64, 0x72, 0x6f, 0x70, 0x70, 0x65, 0x64, 0x32,
-	0xa2, 0x01, 0x0a, 0x14, 0x42, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x49, 0x6e, 0x67, 0x65, 0x73,
-	0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x45, 0x0a, 0x0a, 0x57, 0x72, 0x69, 0x74,
-	0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x12, 0x1a, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65,
-	0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x1a, 0x1b, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x57, 0x72, 0x69,
-	0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
-	0x43, 0x0a, 0x13, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x57, 0x72, 0x69, 0x74,
-	0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x12, 0x1a, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65,
-	0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x1a, 0x0e, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x45, 0x6d, 0x70,
-	0x74, 0x79, 0x28, 0x01, 0x3a, 0x46, 0x0a, 0x0d, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x5f,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x64, 0x72, 0x6f, 0x70, 0x70, 0x65, 0x64, 0x22,
+	0x4a, 0x0a, 0x20, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65,
+	0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x57, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61,
+	0x74, 0x63, 0x68, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x34, 0x0a, 0x1e, 0x53,
+	0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65,
+	0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x79, 0x70, 0x65, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a,
+	0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74, 0x79, 0x70,
+	0x65, 0x22, 0x7a, 0x0a, 0x1e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x53, 0x65,
+	0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x54, 0x79, 0x70, 0x65, 0x49,
+	0x6e, 0x66, 0x6f, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x1e, 0x0a, 0x0a, 0x64, 0x65, 0x73, 0x63, 0x72,
+	0x69, 0x70, 0x74, 0x6f, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0a, 0x64, 0x65, 0x73,
+	0x63, 0x72, 0x69, 0x70, 0x74, 0x6f, 0x72, 0x12, 0x24, 0x0a, 0x0e, 0x6d, 0x61, 0x78, 0x5f, 0x62,
+	0x61, 0x74, 0x63, 0x68, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52,
+	0x0c, 0x6d, 0x61, 0x78, 0x42, 0x61, 0x74, 0x63, 0x68, 0x53, 0x69, 0x7a, 0x65, 0x22, 0x56, 0x0a,
+	0x26, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72,
+	0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x57, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63,
+	0x68, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x2c, 0x0a, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c,
+	0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x14, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c,
+	0x65, 0x2e, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x52, 0x06, 0x72,
+	0x65, 0x73, 0x75, 0x6c, 0x74, 0x22, 0x53, 0x0a, 0x23, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69,
+	0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x55,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x44, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x12, 0x12, 0x0a, 0x04,
+	0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65,
+	0x12, 0x18, 0x0a, 0x07, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0c, 0x52, 0x07, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x22, 0x51, 0x0a, 0x1d, 0x53, 0x74,
+	0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x42, 0x61, 0x63, 0x6b, 0x6f, 0x66, 0x66, 0x12, 0x1a, 0x0a, 0x08, 0x64,
+	0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x08, 0x64,
+	0x75, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x79, 0x70, 0x65, 0x73,
+	0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x74, 0x79, 0x70, 0x65, 0x73, 0x22, 0xc6, 0x01,
+	0x0a, 0x16, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e,
+	0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x4c, 0x0a, 0x0b, 0x77, 0x72, 0x69, 0x74,
+	0x65, 0x5f, 0x62, 0x61, 0x74, 0x63, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x29, 0x2e,
+	0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e,
+	0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x57, 0x72,
+	0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x48, 0x00, 0x52, 0x0a, 0x77, 0x72, 0x69, 0x74,
+	0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x12, 0x55, 0x0a, 0x0e, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65,
+	0x5f, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2c,
+	0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69,
+	0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x55,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x44, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x48, 0x00, 0x52, 0x0d,
+	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x44, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x42, 0x07, 0x0a,
+	0x05, 0x69, 0x6e, 0x6e, 0x65, 0x72, 0x22, 0xc6, 0x01, 0x0a, 0x16, 0x53, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x69, 0x6e, 0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x12, 0x5f, 0x0a, 0x12, 0x77, 0x72, 0x69, 0x74, 0x65, 0x5f, 0x62, 0x61, 0x74, 0x63, 0x68,
+	0x5f, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2f, 0x2e,
+	0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e,
+	0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x57, 0x72,
+	0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x48, 0x00,
+	0x52, 0x10, 0x77, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x75,
+	0x6c, 0x74, 0x12, 0x42, 0x0a, 0x07, 0x62, 0x61, 0x63, 0x6b, 0x6f, 0x66, 0x66, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x26, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74,
+	0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x42, 0x61, 0x63, 0x6b, 0x6f, 0x66, 0x66, 0x48, 0x00, 0x52, 0x07, 0x62,
+	0x61, 0x63, 0x6b, 0x6f, 0x66, 0x66, 0x42, 0x07, 0x0a, 0x05, 0x69, 0x6e, 0x6e, 0x65, 0x72, 0x2a,
+	0x60, 0x0a, 0x0b, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x06,
+	0x0a, 0x02, 0x4f, 0x4b, 0x10, 0x00, 0x12, 0x0b, 0x0a, 0x07, 0x54, 0x4f, 0x4f, 0x5f, 0x42, 0x49,
+	0x47, 0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x46, 0x55, 0x4c, 0x4c, 0x10, 0x02, 0x12, 0x0f, 0x0a,
+	0x0b, 0x55, 0x4e, 0x4b, 0x5f, 0x4d, 0x45, 0x53, 0x53, 0x41, 0x47, 0x45, 0x10, 0x03, 0x12, 0x0e,
+	0x0a, 0x0a, 0x44, 0x45, 0x43, 0x4f, 0x44, 0x45, 0x5f, 0x45, 0x52, 0x52, 0x10, 0x04, 0x12, 0x11,
+	0x0a, 0x0d, 0x54, 0x52, 0x41, 0x4e, 0x53, 0x43, 0x4f, 0x44, 0x45, 0x5f, 0x45, 0x52, 0x52, 0x10,
+	0x05, 0x32, 0xb0, 0x01, 0x0a, 0x14, 0x42, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x49, 0x6e, 0x67,
+	0x65, 0x73, 0x74, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x45, 0x0a, 0x0a, 0x57, 0x72,
+	0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x12, 0x1a, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74,
+	0x6c, 0x65, 0x2e, 0x57, 0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x1b, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x57,
+	0x72, 0x69, 0x74, 0x65, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x51, 0x0a, 0x09, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67, 0x12, 0x1f,
+	0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69,
+	0x6e, 0x67, 0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x1a,
+	0x1f, 0x2e, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x2e, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d,
+	0x69, 0x6e, 0x67, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
+	0x28, 0x01, 0x30, 0x01, 0x3a, 0x46, 0x0a, 0x0d, 0x62, 0x72, 0x69, 0x73, 0x74, 0x6c, 0x65, 0x5f,
 	0x74, 0x61, 0x62, 0x6c, 0x65, 0x12, 0x1f, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70,
 	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x4f,
 	0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0xd1, 0x86, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c,
@@ -339,29 +943,44 @@ func file_bristle_proto_rawDescGZIP() []byte {
 	return file_bristle_proto_rawDescData
 }
 
-var file_bristle_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_bristle_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_bristle_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_bristle_proto_goTypes = []interface{}{
-	(*Payload)(nil),                   // 0: bristle.Payload
-	(*Empty)(nil),                     // 1: bristle.Empty
-	(*WriteBatchRequest)(nil),         // 2: bristle.WriteBatchRequest
-	(*WriteBatchResponse)(nil),        // 3: bristle.WriteBatchResponse
-	(*descriptor.MessageOptions)(nil), // 4: google.protobuf.MessageOptions
-	(*descriptor.FieldOptions)(nil),   // 5: google.protobuf.FieldOptions
+	(BatchResult)(0),                               // 0: bristle.BatchResult
+	(*Payload)(nil),                                // 1: bristle.Payload
+	(*Empty)(nil),                                  // 2: bristle.Empty
+	(*WriteBatchRequest)(nil),                      // 3: bristle.WriteBatchRequest
+	(*WriteBatchResponse)(nil),                     // 4: bristle.WriteBatchResponse
+	(*StreamingClientMessageWriteBatch)(nil),       // 5: bristle.StreamingClientMessageWriteBatch
+	(*StreamingClientMessageTypeInfo)(nil),         // 6: bristle.StreamingClientMessageTypeInfo
+	(*StreamingServerMessageTypeInfo)(nil),         // 7: bristle.StreamingServerMessageTypeInfo
+	(*StreamingServerMessageWriteBatchResult)(nil), // 8: bristle.StreamingServerMessageWriteBatchResult
+	(*StreamingClientMessageUpdateDefault)(nil),    // 9: bristle.StreamingClientMessageUpdateDefault
+	(*StreamingServerMessageBackoff)(nil),          // 10: bristle.StreamingServerMessageBackoff
+	(*StreamingClientMessage)(nil),                 // 11: bristle.StreamingClientMessage
+	(*StreamingServerMessage)(nil),                 // 12: bristle.StreamingServerMessage
+	(*descriptor.MessageOptions)(nil),              // 13: google.protobuf.MessageOptions
+	(*descriptor.FieldOptions)(nil),                // 14: google.protobuf.FieldOptions
 }
 var file_bristle_proto_depIdxs = []int32{
-	0, // 0: bristle.WriteBatchRequest.payloads:type_name -> bristle.Payload
-	4, // 1: bristle.bristle_table:extendee -> google.protobuf.MessageOptions
-	5, // 2: bristle.bristle_column:extendee -> google.protobuf.FieldOptions
-	5, // 3: bristle.bristle_clickhouse_type:extendee -> google.protobuf.FieldOptions
-	2, // 4: bristle.BristleIngestService.WriteBatch:input_type -> bristle.WriteBatchRequest
-	2, // 5: bristle.BristleIngestService.StreamingWriteBatch:input_type -> bristle.WriteBatchRequest
-	3, // 6: bristle.BristleIngestService.WriteBatch:output_type -> bristle.WriteBatchResponse
-	1, // 7: bristle.BristleIngestService.StreamingWriteBatch:output_type -> bristle.Empty
-	6, // [6:8] is the sub-list for method output_type
-	4, // [4:6] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	1, // [1:4] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1,  // 0: bristle.WriteBatchRequest.payloads:type_name -> bristle.Payload
+	0,  // 1: bristle.StreamingServerMessageWriteBatchResult.result:type_name -> bristle.BatchResult
+	5,  // 2: bristle.StreamingClientMessage.write_batch:type_name -> bristle.StreamingClientMessageWriteBatch
+	9,  // 3: bristle.StreamingClientMessage.update_default:type_name -> bristle.StreamingClientMessageUpdateDefault
+	8,  // 4: bristle.StreamingServerMessage.write_batch_result:type_name -> bristle.StreamingServerMessageWriteBatchResult
+	10, // 5: bristle.StreamingServerMessage.backoff:type_name -> bristle.StreamingServerMessageBackoff
+	13, // 6: bristle.bristle_table:extendee -> google.protobuf.MessageOptions
+	14, // 7: bristle.bristle_column:extendee -> google.protobuf.FieldOptions
+	14, // 8: bristle.bristle_clickhouse_type:extendee -> google.protobuf.FieldOptions
+	3,  // 9: bristle.BristleIngestService.WriteBatch:input_type -> bristle.WriteBatchRequest
+	11, // 10: bristle.BristleIngestService.Streaming:input_type -> bristle.StreamingClientMessage
+	4,  // 11: bristle.BristleIngestService.WriteBatch:output_type -> bristle.WriteBatchResponse
+	12, // 12: bristle.BristleIngestService.Streaming:output_type -> bristle.StreamingServerMessage
+	11, // [11:13] is the sub-list for method output_type
+	9,  // [9:11] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	6,  // [6:9] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_bristle_proto_init() }
@@ -418,19 +1037,124 @@ func file_bristle_proto_init() {
 				return nil
 			}
 		}
+		file_bristle_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingClientMessageWriteBatch); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingClientMessageTypeInfo); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingServerMessageTypeInfo); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingServerMessageWriteBatchResult); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingClientMessageUpdateDefault); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingServerMessageBackoff); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingClientMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_bristle_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StreamingServerMessage); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+	}
+	file_bristle_proto_msgTypes[10].OneofWrappers = []interface{}{
+		(*StreamingClientMessage_WriteBatch)(nil),
+		(*StreamingClientMessage_UpdateDefault)(nil),
+	}
+	file_bristle_proto_msgTypes[11].OneofWrappers = []interface{}{
+		(*StreamingServerMessage_WriteBatchResult)(nil),
+		(*StreamingServerMessage_Backoff)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_bristle_proto_rawDesc,
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   12,
 			NumExtensions: 3,
 			NumServices:   1,
 		},
 		GoTypes:           file_bristle_proto_goTypes,
 		DependencyIndexes: file_bristle_proto_depIdxs,
+		EnumInfos:         file_bristle_proto_enumTypes,
 		MessageInfos:      file_bristle_proto_msgTypes,
 		ExtensionInfos:    file_bristle_proto_extTypes,
 	}.Build()
@@ -454,8 +1178,8 @@ const _ = grpc.SupportPackageIsVersion6
 type BristleIngestServiceClient interface {
 	// Writes a single batch containing multiple payloads
 	WriteBatch(ctx context.Context, in *WriteBatchRequest, opts ...grpc.CallOption) (*WriteBatchResponse, error)
-	// Streaming write of batches containing multiple payloads
-	StreamingWriteBatch(ctx context.Context, opts ...grpc.CallOption) (BristleIngestService_StreamingWriteBatchClient, error)
+	// Bi-directional streaming API
+	Streaming(ctx context.Context, opts ...grpc.CallOption) (BristleIngestService_StreamingClient, error)
 }
 
 type bristleIngestServiceClient struct {
@@ -475,34 +1199,31 @@ func (c *bristleIngestServiceClient) WriteBatch(ctx context.Context, in *WriteBa
 	return out, nil
 }
 
-func (c *bristleIngestServiceClient) StreamingWriteBatch(ctx context.Context, opts ...grpc.CallOption) (BristleIngestService_StreamingWriteBatchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_BristleIngestService_serviceDesc.Streams[0], "/bristle.BristleIngestService/StreamingWriteBatch", opts...)
+func (c *bristleIngestServiceClient) Streaming(ctx context.Context, opts ...grpc.CallOption) (BristleIngestService_StreamingClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_BristleIngestService_serviceDesc.Streams[0], "/bristle.BristleIngestService/Streaming", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &bristleIngestServiceStreamingWriteBatchClient{stream}
+	x := &bristleIngestServiceStreamingClient{stream}
 	return x, nil
 }
 
-type BristleIngestService_StreamingWriteBatchClient interface {
-	Send(*WriteBatchRequest) error
-	CloseAndRecv() (*Empty, error)
+type BristleIngestService_StreamingClient interface {
+	Send(*StreamingClientMessage) error
+	Recv() (*StreamingServerMessage, error)
 	grpc.ClientStream
 }
 
-type bristleIngestServiceStreamingWriteBatchClient struct {
+type bristleIngestServiceStreamingClient struct {
 	grpc.ClientStream
 }
 
-func (x *bristleIngestServiceStreamingWriteBatchClient) Send(m *WriteBatchRequest) error {
+func (x *bristleIngestServiceStreamingClient) Send(m *StreamingClientMessage) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *bristleIngestServiceStreamingWriteBatchClient) CloseAndRecv() (*Empty, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(Empty)
+func (x *bristleIngestServiceStreamingClient) Recv() (*StreamingServerMessage, error) {
+	m := new(StreamingServerMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -513,8 +1234,8 @@ func (x *bristleIngestServiceStreamingWriteBatchClient) CloseAndRecv() (*Empty, 
 type BristleIngestServiceServer interface {
 	// Writes a single batch containing multiple payloads
 	WriteBatch(context.Context, *WriteBatchRequest) (*WriteBatchResponse, error)
-	// Streaming write of batches containing multiple payloads
-	StreamingWriteBatch(BristleIngestService_StreamingWriteBatchServer) error
+	// Bi-directional streaming API
+	Streaming(BristleIngestService_StreamingServer) error
 }
 
 // UnimplementedBristleIngestServiceServer can be embedded to have forward compatible implementations.
@@ -524,8 +1245,8 @@ type UnimplementedBristleIngestServiceServer struct {
 func (*UnimplementedBristleIngestServiceServer) WriteBatch(context.Context, *WriteBatchRequest) (*WriteBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteBatch not implemented")
 }
-func (*UnimplementedBristleIngestServiceServer) StreamingWriteBatch(BristleIngestService_StreamingWriteBatchServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamingWriteBatch not implemented")
+func (*UnimplementedBristleIngestServiceServer) Streaming(BristleIngestService_StreamingServer) error {
+	return status.Errorf(codes.Unimplemented, "method Streaming not implemented")
 }
 
 func RegisterBristleIngestServiceServer(s *grpc.Server, srv BristleIngestServiceServer) {
@@ -550,26 +1271,26 @@ func _BristleIngestService_WriteBatch_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BristleIngestService_StreamingWriteBatch_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(BristleIngestServiceServer).StreamingWriteBatch(&bristleIngestServiceStreamingWriteBatchServer{stream})
+func _BristleIngestService_Streaming_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(BristleIngestServiceServer).Streaming(&bristleIngestServiceStreamingServer{stream})
 }
 
-type BristleIngestService_StreamingWriteBatchServer interface {
-	SendAndClose(*Empty) error
-	Recv() (*WriteBatchRequest, error)
+type BristleIngestService_StreamingServer interface {
+	Send(*StreamingServerMessage) error
+	Recv() (*StreamingClientMessage, error)
 	grpc.ServerStream
 }
 
-type bristleIngestServiceStreamingWriteBatchServer struct {
+type bristleIngestServiceStreamingServer struct {
 	grpc.ServerStream
 }
 
-func (x *bristleIngestServiceStreamingWriteBatchServer) SendAndClose(m *Empty) error {
+func (x *bristleIngestServiceStreamingServer) Send(m *StreamingServerMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *bristleIngestServiceStreamingWriteBatchServer) Recv() (*WriteBatchRequest, error) {
-	m := new(WriteBatchRequest)
+func (x *bristleIngestServiceStreamingServer) Recv() (*StreamingClientMessage, error) {
+	m := new(StreamingClientMessage)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -587,8 +1308,9 @@ var _BristleIngestService_serviceDesc = grpc.ServiceDesc{
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamingWriteBatch",
-			Handler:       _BristleIngestService_StreamingWriteBatch_Handler,
+			StreamName:    "Streaming",
+			Handler:       _BristleIngestService_Streaming_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},
