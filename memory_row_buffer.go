@@ -32,6 +32,10 @@ func NewMemoryBuffer(name string, maxSize int, onFull OnFullBehavior) (*MemoryRo
 		return nil, fmt.Errorf("invalid on-full behavior '%v'", onFull)
 	}
 
+	if maxSize == 0 {
+		maxSize = 1000
+	}
+
 	return &MemoryRowBuffer{
 		name:    name,
 		maxSize: maxSize,
@@ -47,6 +51,12 @@ func (m *MemoryRowBuffer) WriteBatch(batch [][]interface{}) v1.BatchResult {
 	// We can't possibly flush a batch greater than our internal size
 	batchSize := len(batch)
 	if batchSize > m.maxSize {
+		log.Trace().
+			Str("name", m.name).
+			Int("max-size", m.maxSize).
+			Int("batch-size", batchSize).
+			Msg("memory-buffer: batch is simply too big bud!")
+
 		return v1.BatchResult_TOO_BIG
 	}
 

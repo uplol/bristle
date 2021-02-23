@@ -33,8 +33,10 @@ message WriteBatchResponse {
 }
 
 message StreamingClientMessageWriteBatch {
-  string type = 1;
-  bytes data = 2;
+  uint32 id = 1;
+  string type = 2;
+  uint32 size = 3;
+  bytes data = 4;
 }
 
 enum BatchResult {
@@ -54,7 +56,10 @@ message StreamingServerMessageTypeInfo {
   uint32 max_batch_size = 3;
 }
 
-message StreamingServerMessageWriteBatchResult { BatchResult result = 1; }
+message StreamingServerMessageWriteBatchResult {
+  uint32 id = 1;
+  BatchResult result = 2;
+}
 
 message StreamingClientMessageUpdateDefault {
   string type = 1;
@@ -62,7 +67,7 @@ message StreamingClientMessageUpdateDefault {
 }
 
 message StreamingServerMessageBackoff {
-  uint32 duration = 1;
+  uint64 until = 1;
   repeated string types = 2;
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -49,7 +50,6 @@ func (i *IngestService) Run(ctx context.Context) {
 		server := grpc.NewServer(opts...)
 
 		v1.RegisterBristleIngestServiceServer(server, i)
-		// ingestv1.RegisterIngestServiceServer(server, m)
 		go server.Serve(i.listener)
 		<-ctx.Done()
 		i.listener.Close()
@@ -102,6 +102,61 @@ func (i *IngestService) WriteBatch(ctx context.Context, req *v1.WriteBatchReques
 	}, nil
 }
 
+func (i IngestService) writeStreamingBatch(stream v1.BristleIngestService_StreamingServer, batch *v1.StreamingClientMessageWriteBatch) {
+	writeResult := func(result v1.BatchResult) {
+		stream.Send(&v1.StreamingServerMessage{
+			Inner: &v1.StreamingServerMessage_WriteBatchResult{
+				WriteBatchResult: &v1.StreamingServerMessageWriteBatchResult{
+					Id:     batch.Id,
+					Result: result,
+				},
+			},
+		})
+	}
+
+	// Grab a binding for the given payload type
+	i.server.RLock()
+	binding, ok := i.server.messageBindingRegistry[batch.Type]
+	i.server.RUnlock()
+	if !ok {
+		writeResult(v1.BatchResult_UNK_MESSAGE)
+		return
+	}
+
+	reflectMessage := binding.InstancePool.Get()
+	messageInstance := reflectMessage.Interface()
+	defer binding.InstancePool.Release(reflectMessage)
+
+	idx := 0
+	offset := 0
+	messages := make([][]interface{}, batch.Size)
+	for {
+		if offset >= len(batch.Data) {
+			break
+		}
+
+		messageData, bytesRead := protowire.ConsumeBytes(batch.Data[offset:])
+		offset += bytesRead
+
+		err := proto.Unmarshal(messageData, messageInstance)
+		if err != nil {
+			writeResult(v1.BatchResult_DECODE_ERR)
+			return
+		}
+
+		row := binding.PrepareFunc(reflectMessage)
+		if row == nil {
+			writeResult(v1.BatchResult_TRANSCODE_ERR)
+			return
+		}
+
+		messages[idx] = row
+		idx += 1
+	}
+
+	writeResult(binding.Table.WriteBatch(messages))
+}
+
 func (i *IngestService) Streaming(stream v1.BristleIngestService_StreamingServer) error {
 	for {
 		message, err := stream.Recv()
@@ -111,11 +166,10 @@ func (i *IngestService) Streaming(stream v1.BristleIngestService_StreamingServer
 			return err
 		}
 
-		// switch innerMessage := message.Inner.(type) {
-		// case *v1.StreamingClientMessage_WriteBatch:
-		// 	innerMessage.WriteBatch
-		// }
-
-		log.Printf("message is %v", message)
+		switch innerMessage := message.Inner.(type) {
+		case *v1.StreamingClientMessage_WriteBatch:
+			// TODO: limit concurrency
+			go i.writeStreamingBatch(stream, innerMessage.WriteBatch)
+		}
 	}
 }

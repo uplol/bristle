@@ -5,13 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/uplol/bristle"
+	"github.com/uplol/bristle/client"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
@@ -20,70 +21,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-type Batcher struct {
-	sync.Mutex
-
-	typeName      string
-	flushInterval time.Duration
-	buffer        [][]byte
-}
-
-func NewBatcher(typeName string, flushInterval time.Duration) *Batcher {
-	return &Batcher{
-		typeName:      typeName,
-		flushInterval: flushInterval,
-		buffer:        make([][]byte, 0),
-	}
-}
-
-func (b *Batcher) Add(data []byte) {
-	b.Lock()
-	defer b.Unlock()
-	b.buffer = append(b.buffer, data)
-}
-
-func (b *Batcher) flush() *v1.Payload {
-	b.Lock()
-	defer b.Unlock()
-	if len(b.buffer) == 0 {
-		return nil
-	}
-
-	payload := &v1.Payload{
-		Type: b.typeName,
-		Body: b.buffer,
-	}
-	b.buffer = make([][]byte, 0)
-	return payload
-}
-
-func (b *Batcher) RunFlusher(ctx context.Context, destination chan<- *v1.Payload, done chan struct{}) {
-	ticker := time.NewTicker(b.flushInterval)
-	defer close(done)
-
-	for {
-		select {
-		case <-ticker.C:
-			batch := b.flush()
-			if batch != nil {
-				destination <- batch
-				log.Debug().Int("batch-size", len(batch.Body)).Msg("flusher: batch flushed to sender")
-				continue
-			}
-		}
-
-		select {
-		case <-ctx.Done():
-			log.Printf("flusher is done!")
-			return
-		default:
-			continue
-		}
-	}
-}
-
-func stdinProcessor(messageType protoreflect.MessageType, batcher *Batcher) error {
+func stdinProcessor(messageType protoreflect.MessageType, batcher *client.BristleBatcher) error {
 	body := messageType.New().Interface()
+	typeName := string(messageType.Descriptor().FullName())
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		data, err := reader.ReadBytes('\n')
@@ -93,14 +33,15 @@ func stdinProcessor(messageType protoreflect.MessageType, batcher *Batcher) erro
 
 		err = protojson.Unmarshal(data, body)
 		if err != nil {
+			log.Printf("%v", string(data))
 			return err
 		}
 
-		binaryData, err := proto.Marshal(body)
+		err = batcher.WriteBatch(typeName, []proto.Message{body})
 		if err != nil {
+			log.Printf("OOF")
 			return err
 		}
-		batcher.Add(binaryData)
 	}
 }
 
@@ -188,17 +129,27 @@ func run(ctx *cli.Context) error {
 		return errors.New("could not find registered message for type: " + selectedMessageTypeName)
 	}
 
-	bgCtx, cancel := context.WithCancel(context.Background())
-
 	done := make(chan struct{})
 	payloads := make(chan *v1.Payload)
 
-	batcher := NewBatcher(selectedMessageTypeName, time.Duration(ctx.Int("flush-interval"))*time.Millisecond)
+	upstreamURL, err := url.Parse(ctx.String("upstream"))
+	if err != nil {
+		return err
+	}
 
-	go batcher.RunFlusher(bgCtx, payloads, done)
+	bristleClient := client.NewBristleClient(upstreamURL)
+	bristleBatcher := client.NewBristleBatcher(bristleClient, client.BristleBatcherConfig{
+		BufferSize:    100000,
+		Retry:         true,
+		FlushInterval: time.Second * 5,
+	})
+
+	bgCtx, cancel := context.WithCancel(context.Background())
+	go bristleClient.Run(bgCtx)
+	go bristleBatcher.Run(bgCtx)
 
 	go func() {
-		err := stdinProcessor(messageType, batcher)
+		err := stdinProcessor(messageType, bristleBatcher)
 		if err != nil {
 			log.Error().Err(err).Msg("stdin: encountered error")
 		}
@@ -226,7 +177,7 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "upstream",
-				Value: "localhost:8122",
+				Value: "bristle://localhost:8122",
 				Usage: "address of the upstream bristle ingest service we will forward payloads too",
 			},
 			&cli.StringFlag{
