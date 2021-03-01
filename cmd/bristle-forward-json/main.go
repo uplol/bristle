@@ -22,7 +22,6 @@ import (
 )
 
 func stdinProcessor(messageType protoreflect.MessageType, batcher *client.BristleBatcher) error {
-	body := messageType.New().Interface()
 	typeName := string(messageType.Descriptor().FullName())
 	reader := bufio.NewReader(os.Stdin)
 	for {
@@ -31,15 +30,15 @@ func stdinProcessor(messageType protoreflect.MessageType, batcher *client.Bristl
 			return err
 		}
 
+		body := messageType.New().Interface()
 		err = protojson.Unmarshal(data, body)
 		if err != nil {
-			log.Printf("%v", string(data))
-			return err
+			log.Error().Err(err).Str("data", string(data)).Msg("stdin-processor: failed to parse JSON")
+			continue
 		}
 
 		err = batcher.WriteBatch(typeName, []proto.Message{body})
 		if err != nil {
-			log.Printf("OOF")
 			return err
 		}
 	}

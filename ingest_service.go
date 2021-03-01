@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
@@ -102,34 +104,39 @@ func (i *IngestService) WriteBatch(ctx context.Context, req *v1.WriteBatchReques
 	}, nil
 }
 
-func (i IngestService) writeStreamingBatch(stream v1.BristleIngestService_StreamingServer, batch *v1.StreamingClientMessageWriteBatch) {
-	writeResult := func(result v1.BatchResult) {
-		stream.Send(&v1.StreamingServerMessage{
-			Inner: &v1.StreamingServerMessage_WriteBatchResult{
-				WriteBatchResult: &v1.StreamingServerMessageWriteBatchResult{
-					Id:     batch.Id,
-					Result: result,
-				},
-			},
-		})
+func (i IngestService) writeStreamingBatch(session *StreamingClientSession, batch *v1.StreamingClientMessageWriteBatch) {
+	var typeName string
+	var ok bool
+	switch innerMessageType := batch.MessageType.(type) {
+	case *v1.StreamingClientMessageWriteBatch_TypeId:
+		session.Lock()
+		typeName, ok = session.identifiedMessageTypes[innerMessageType.TypeId]
+		session.Unlock()
+		if !ok {
+			session.WriteBatchResult(batch.Id, v1.BatchResult_UNK_MESSAGE)
+			return
+		}
+	case *v1.StreamingClientMessageWriteBatch_TypeName:
+		typeName = innerMessageType.TypeName
 	}
 
 	// Grab a binding for the given payload type
 	i.server.RLock()
-	binding, ok := i.server.messageBindingRegistry[batch.Type]
+	binding, ok := i.server.messageBindingRegistry[typeName]
 	i.server.RUnlock()
 	if !ok {
-		writeResult(v1.BatchResult_UNK_MESSAGE)
+		session.WriteBatchResult(batch.Id, v1.BatchResult_UNK_MESSAGE)
 		return
 	}
 
+	// Fetch an existing instance of the message type from the bindings pool
 	reflectMessage := binding.InstancePool.Get()
 	messageInstance := reflectMessage.Interface()
 	defer binding.InstancePool.Release(reflectMessage)
 
 	idx := 0
 	offset := 0
-	messages := make([][]interface{}, batch.Size)
+	messages := make([][]interface{}, batch.Length)
 	for {
 		if offset >= len(batch.Data) {
 			break
@@ -140,13 +147,13 @@ func (i IngestService) writeStreamingBatch(stream v1.BristleIngestService_Stream
 
 		err := proto.Unmarshal(messageData, messageInstance)
 		if err != nil {
-			writeResult(v1.BatchResult_DECODE_ERR)
+			session.WriteBatchResult(batch.Id, v1.BatchResult_DECODE_ERR)
 			return
 		}
 
 		row := binding.PrepareFunc(reflectMessage)
 		if row == nil {
-			writeResult(v1.BatchResult_TRANSCODE_ERR)
+			session.WriteBatchResult(batch.Id, v1.BatchResult_TRANSCODE_ERR)
 			return
 		}
 
@@ -154,10 +161,14 @@ func (i IngestService) writeStreamingBatch(stream v1.BristleIngestService_Stream
 		idx += 1
 	}
 
-	writeResult(binding.Table.WriteBatch(messages))
+	session.WriteBatchResult(batch.Id, binding.Table.WriteBatch(messages))
 }
 
+var ErrUnsupported = errors.New("unsupported")
+
 func (i *IngestService) Streaming(stream v1.BristleIngestService_StreamingServer) error {
+	session := NewStreamingClientSession(stream, 12)
+
 	for {
 		message, err := stream.Recv()
 		if err == io.EOF {
@@ -167,9 +178,72 @@ func (i *IngestService) Streaming(stream v1.BristleIngestService_StreamingServer
 		}
 
 		switch innerMessage := message.Inner.(type) {
+		case *v1.StreamingClientMessage_RegisterMessageType:
+			descriptor := innerMessage.RegisterMessageType.GetDescriptor_()
+
+			// TODO: support dynamically registering and binding messages
+			if len(descriptor) > 0 {
+				return ErrUnsupported
+			}
+
+			session.Lock()
+			session.identifiedMessageTypeIdx += 1
+			messageTypeId := session.identifiedMessageTypeIdx
+			session.identifiedMessageTypes[session.identifiedMessageTypeIdx] = innerMessage.RegisterMessageType.Type
+			session.Unlock()
+
+			session.stream.Send(&v1.StreamingServerMessage{
+				Inner: &v1.StreamingServerMessage_IdentifyMessageType{
+					IdentifyMessageType: &v1.StreamingServerMessageIdentifyMessageType{
+						Type: innerMessage.RegisterMessageType.Type,
+						Id:   messageTypeId,
+					},
+				},
+			})
 		case *v1.StreamingClientMessage_WriteBatch:
-			// TODO: limit concurrency
-			go i.writeStreamingBatch(stream, innerMessage.WriteBatch)
+			if acquired := session.batchWriteSem.TryAcquire(1); !acquired {
+				session.WriteBatchResult(innerMessage.WriteBatch.Id, v1.BatchResult_TOO_MANY_IN_FLIGHT_BATCHES)
+				continue
+			}
+
+			go func() {
+				defer session.batchWriteSem.Release(1)
+				i.writeStreamingBatch(session, innerMessage.WriteBatch)
+			}()
+		case *v1.StreamingClientMessage_UpdateDefault:
+			// TODO: support setting a message default per-client session
+			return ErrUnsupported
 		}
+
 	}
+}
+
+type StreamingClientSession struct {
+	sync.Mutex
+
+	stream        v1.BristleIngestService_StreamingServer
+	batchWriteSem *semaphore.Weighted
+
+	identifiedMessageTypeIdx uint32
+	identifiedMessageTypes   map[uint32]string
+}
+
+func NewStreamingClientSession(stream v1.BristleIngestService_StreamingServer, maxConcurrentBatchWrites int64) *StreamingClientSession {
+	return &StreamingClientSession{
+		stream:        stream,
+		batchWriteSem: semaphore.NewWeighted(maxConcurrentBatchWrites),
+	}
+}
+
+func (s *StreamingClientSession) WriteBatchResult(batchId uint32, result v1.BatchResult) error {
+	s.Lock()
+	defer s.Unlock()
+	return s.stream.Send(&v1.StreamingServerMessage{
+		Inner: &v1.StreamingServerMessage_WriteBatchResult{
+			WriteBatchResult: &v1.StreamingServerMessageWriteBatchResult{
+				Id:     batchId,
+				Result: result,
+			},
+		},
+	})
 }

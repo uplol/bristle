@@ -27,9 +27,9 @@ type BristleClient struct {
 	idInc        uint32
 
 	// Batch results
-	results chan *v1.StreamingServerMessageWriteBatchResult
-
-	outgoing chan *v1.StreamingClientMessage
+	startupCond *sync.Cond
+	results     chan *v1.StreamingServerMessageWriteBatchResult
+	outgoing    chan *v1.StreamingClientMessage
 }
 
 func NewBristleClient(dsn *url.URL) *BristleClient {
@@ -37,8 +37,7 @@ func NewBristleClient(dsn *url.URL) *BristleClient {
 		dsn:          dsn,
 		backoffUntil: 0,
 		idInc:        0,
-		results:      make(chan *v1.StreamingServerMessageWriteBatchResult),
-		outgoing:     make(chan *v1.StreamingClientMessage, 8),
+		startupCond:  sync.NewCond(&sync.Mutex{}),
 	}
 }
 
@@ -47,6 +46,7 @@ func (b *BristleClient) Run(ctx context.Context) {
 		err := b.runClient(ctx)
 		if ctx.Done() != nil && err != nil {
 			log.Error().Err(err).Msg("bristle-client: runClient encountered error, retrying in 5 seconds")
+			b.startupCond = sync.NewCond(&sync.Mutex{})
 			time.Sleep(time.Second * 5)
 			continue
 		}
@@ -55,11 +55,21 @@ func (b *BristleClient) Run(ctx context.Context) {
 }
 
 func (b *BristleClient) runClient(ctx context.Context) error {
+	// Create new communication channels and signal we've started up
+	b.results = make(chan *v1.StreamingServerMessageWriteBatchResult)
+	b.outgoing = make(chan *v1.StreamingClientMessage, 8)
+	b.startupCond.Broadcast()
+	b.startupCond = nil
+
 	conn, err := grpc.Dial(b.dsn.Host, grpc.WithInsecure())
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		close(b.results)
+		close(b.outgoing)
+		conn.Close()
+	}()
 
 	client := v1.NewBristleIngestServiceClient(conn)
 
@@ -113,15 +123,15 @@ func (b *BristleClient) runClient(ctx context.Context) error {
 	}
 }
 
+var BatchClientError = errors.New("client encountered internal error writing batch")
 var BatchTooBig = errors.New("batch was too big for the upstream to handle")
 
 func (b *BristleClient) WriteBatchSync(messageType string, messages []proto.Message, retryTimes int) error {
 	b.writerLock.Lock()
 	defer b.writerLock.Unlock()
 
-	// Serialize the type
+	// Serialize the messages into a buffer
 	data := []byte{}
-
 	for _, message := range messages {
 		messageData, err := proto.Marshal(message)
 		if err != nil {
@@ -139,30 +149,43 @@ func (b *BristleClient) WriteBatchSync(messageType string, messages []proto.Mess
 			continue
 		}
 
+		// Block here if we are waiting for the connection to startup
+		if b.startupCond != nil {
+			b.startupCond.L.Lock()
+			b.startupCond.Wait()
+		}
+
 		b.idInc += 1
 		b.outgoing <- &v1.StreamingClientMessage{
 			Inner: &v1.StreamingClientMessage_WriteBatch{
 				WriteBatch: &v1.StreamingClientMessageWriteBatch{
-					Id:   b.idInc,
-					Type: messageType,
-					Size: uint32(len(messages)),
-					Data: data,
+					Id: b.idInc,
+					MessageType: &v1.StreamingClientMessageWriteBatch_TypeName{
+						TypeName: messageType,
+					},
+					Length: uint32(len(messages)),
+					Data:   data,
 				},
 			},
 		}
 
-		result := <-b.results
-		if result.Result == v1.BatchResult_OK {
-			return nil
-		}
+		result, ok := <-b.results
+		if ok {
+			if result.Result == v1.BatchResult_OK {
+				// Batch was successful
+				return nil
+			}
 
-		// We can't retry this
-		if result.Result == v1.BatchResult_TOO_BIG {
-			return BatchTooBig
+			if result.Result == v1.BatchResult_TOO_BIG {
+				// We can't retry this
+				return BatchTooBig
+			}
 		}
 
 		if retryTimes > 0 {
 			retryTimes -= 1
+			// TODO: more robust backoff calculation here please
+			time.Sleep(time.Second * time.Duration(retryTimes))
 			continue
 		} else if retryTimes == -1 {
 			continue
