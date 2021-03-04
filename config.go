@@ -116,6 +116,7 @@ func (i *IngestServiceConfig) GetTransportCredentials() (credentials.TransportCr
 	if err != nil {
 		return nil, err
 	}
+
 	return credentials.NewTLS(&tls.Config{
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.NoClientCert,

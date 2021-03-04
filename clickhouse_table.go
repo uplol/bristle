@@ -226,12 +226,6 @@ func (t *ClickhouseTable) BindMessage(messageType protoreflect.MessageType, pool
 		}
 	}
 
-	if l := log.Trace(); l.Enabled() {
-		for _, field := range columnFields {
-			l.Str("name", string(field.desc.FullName())).Interface("field", field).Msg("")
-		}
-	}
-
 	prepare := func(message protoreflect.Message) []interface{} {
 		result := make([]interface{}, columnCount)
 		var ok bool
