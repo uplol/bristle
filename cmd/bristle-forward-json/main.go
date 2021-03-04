@@ -14,8 +14,9 @@ import (
 	"github.com/uplol/bristle"
 	"github.com/uplol/bristle/client"
 	v1 "github.com/uplol/bristle/proto/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -136,7 +137,19 @@ func run(ctx *cli.Context) error {
 		return err
 	}
 
-	bristleClient := client.NewBristleClient(upstreamURL)
+	config := &client.BristleClientConfig{
+		DSN: *upstreamURL,
+	}
+
+	if upstreamCertificate := ctx.Path("upstream-certificate"); upstreamCertificate != "" {
+		creds, err := credentials.NewClientTLSFromFile(upstreamCertificate, "")
+		if err != nil {
+			return err
+		}
+		config.TransportCredentials = creds
+	}
+
+	bristleClient := client.NewBristleClient(config)
 	bristleBatcher := client.NewBristleBatcher(bristleClient, client.BristleBatcherConfig{
 		BufferSize:    100000,
 		Retry:         true,
@@ -178,6 +191,11 @@ func main() {
 				Name:  "upstream",
 				Value: "bristle://localhost:8122",
 				Usage: "address of the upstream bristle ingest service we will forward payloads too",
+			},
+			&cli.StringFlag{
+				Name:  "upstream-certificate",
+				Value: "",
+				Usage: "provide a certificate that will be used to enable TLS for the upstream connection",
 			},
 			&cli.StringFlag{
 				Name:  "type",

@@ -13,12 +13,18 @@ import (
 	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
 
+type BristleClientConfig struct {
+	DSN                  url.URL
+	TransportCredentials credentials.TransportCredentials
+}
+
 type BristleClient struct {
-	dsn    *url.URL
+	config *BristleClientConfig
 	client v1.BristleIngestService_StreamingClient
 
 	// Locked when we are backing off and no batches should be sent
@@ -32,9 +38,9 @@ type BristleClient struct {
 	outgoing    chan *v1.StreamingClientMessage
 }
 
-func NewBristleClient(dsn *url.URL) *BristleClient {
+func NewBristleClient(config *BristleClientConfig) *BristleClient {
 	return &BristleClient{
-		dsn:          dsn,
+		config:       config,
 		backoffUntil: 0,
 		idInc:        0,
 		startupCond:  sync.NewCond(&sync.Mutex{}),
@@ -61,7 +67,15 @@ func (b *BristleClient) runClient(ctx context.Context) error {
 	b.startupCond.Broadcast()
 	b.startupCond = nil
 
-	conn, err := grpc.Dial(b.dsn.Host, grpc.WithInsecure())
+	opts := []grpc.DialOption{}
+
+	if b.config.TransportCredentials != nil {
+		opts = append(opts, grpc.WithTransportCredentials(b.config.TransportCredentials))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
+
+	conn, err := grpc.Dial(b.config.DSN.Host, opts...)
 	if err != nil {
 		return err
 	}
