@@ -71,10 +71,9 @@ func newClickhouseTable(cluster *ClickhouseCluster, fullTableName FullTableName,
 	return table, nil
 }
 
-func (t *ClickhouseTable) WriteBatch(batch [][]interface{}) error {
+func (t *ClickhouseTable) WriteBatch(batch [][]interface{}) v1.BatchResult {
 	result := atomic.AddInt64(&t.writerIndex, 1)
-	t.writers[result%int64(len(t.writers))].buffer.WriteBatch(batch)
-	return nil
+	return t.writers[result%int64(len(t.writers))].buffer.WriteBatch(batch)
 }
 
 // Describes the binding between a message type and its destination Clickhouse table.
@@ -224,12 +223,6 @@ func (t *ClickhouseTable) BindMessage(messageType protoreflect.MessageType, pool
 			} else {
 				return nil, fmt.Errorf("cannot handle arbitrary embedded message of type %v", innerMessageFullName)
 			}
-		}
-	}
-
-	if l := log.Trace(); l.Enabled() {
-		for _, field := range columnFields {
-			l.Str("name", string(field.desc.FullName())).Interface("field", field).Msg("")
 		}
 	}
 

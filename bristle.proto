@@ -32,10 +32,93 @@ message WriteBatchResponse {
   uint64 dropped = 2;
 }
 
+message StreamingClientMessageWriteBatch {
+  // Unique ID per-client that identifies this batch
+  uint32 id = 1;
+
+  // Either the full message type name or a per-session/per-client cached ID
+  oneof message_type {
+    string type_name = 2;
+    uint32 type_id = 3;
+  }
+
+  // The number of messages in this batc$i.
+  uint32 length = 4;
+
+  // The underlying varint-length-prefixed messages
+  bytes data = 5;
+}
+
+enum BatchResult {
+  OK = 0;
+  TOO_BIG = 1;
+  FULL = 2;
+  UNK_MESSAGE = 3;
+  DECODE_ERR = 4;
+  TRANSCODE_ERR = 5;
+  TOO_MANY_IN_FLIGHT_BATCHES = 6;
+}
+
+message StreamingClientMessageTypeInfo { string type = 1; }
+
+message StreamingServerMessageTypeInfo {
+  string type = 1;
+  bytes descriptor = 2;
+  uint32 max_batch_size = 3;
+}
+
+message StreamingServerMessageWriteBatchResult {
+  uint32 id = 1;
+  BatchResult result = 2;
+}
+
+message StreamingClientMessageUpdateDefault {
+  string type = 1;
+  bytes default = 2;
+}
+
+// Registers a message type so that it can be sent using just a short uint32 id.
+// This message also allows you to dynamically register types at runtime if the
+// descriptor is provided.
+message StreamingClientMessageRegisterMessageType {
+  string type = 1;
+
+  // Optional descriptor data, if none is provided this request will only
+  // produce a IdentifyMessageType if the message type is already registered.
+  bytes descriptor = 2;
+}
+
+message StreamingServerMessageIdentifyMessageType {
+  string type = 1;
+  uint32 id = 2;
+}
+
+message StreamingServerMessageBackoff {
+  uint64 until = 1;
+  repeated string types = 2;
+}
+
+message StreamingClientMessage {
+  oneof inner {
+    StreamingClientMessageWriteBatch write_batch = 1;
+    StreamingClientMessageUpdateDefault update_default = 2;
+    StreamingClientMessageRegisterMessageType register_message_type = 3;
+  }
+}
+
+message StreamingServerMessage {
+  oneof inner {
+    StreamingServerMessageWriteBatchResult write_batch_result = 1;
+    StreamingServerMessageBackoff backoff = 2;
+    StreamingServerMessageIdentifyMessageType identify_message_type = 3;
+  }
+}
+
 service BristleIngestService {
   // Writes a single batch containing multiple payloads
   rpc WriteBatch(WriteBatchRequest) returns (WriteBatchResponse);
 
-  // Streaming write of batches containing multiple payloads
-  rpc StreamingWriteBatch(stream WriteBatchRequest) returns (Empty);
+  // Bi-directional streaming API
+  rpc Streaming(stream StreamingClientMessage)
+      returns (stream StreamingServerMessage);
 }
