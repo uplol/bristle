@@ -14,6 +14,7 @@ type Config struct {
 	ProtoDescriptorPaths []string                  `json:"proto_descriptor_paths"`
 	Clusters             []ClickhouseClusterConfig `json:"clusters"`
 	Debugging            *DebuggingConfig          `json:"debugging"`
+	Metrics              bool                      `json:"metrics"`
 	LogLevel             string                    `json:"log_level"`
 
 	// Whether messages that contain a `bristle_table` option will be automatically
@@ -26,6 +27,7 @@ type DebuggingConfig struct {
 	Bind                 string `json:"bind"`
 	BlockProfileRate     *int   `json:"block_profile_rate"`
 	MutexProfileFraction *int   `json:"mutex_profile_fraction"`
+	Metrics              bool   `json:"metrics"`
 }
 
 type TlsConfig struct {
