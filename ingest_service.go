@@ -8,6 +8,7 @@ import (
 	"net"
 	"sync"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog/log"
 	v1 "github.com/uplol/bristle/proto/v1"
 	"golang.org/x/sync/semaphore"
@@ -48,10 +49,24 @@ func (i *IngestService) Run(ctx context.Context) {
 		opts = append(opts, grpc.MaxRecvMsgSize(*i.server.config.IngestService.MaxReceiveMessageSize))
 	}
 
+	var metrics bool
+	if i.server.config.Debugging != nil {
+		metrics = i.server.config.Debugging.Metrics
+	}
+
+	if metrics {
+		// register the grpc server interceptors for prometheus metrics
+		opts = append(opts, grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor), grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
 	go func() {
 		server := grpc.NewServer(opts...)
 
 		v1.RegisterBristleIngestServiceServer(server, i)
+
+		// register the grpc server with grpc_prometheus once the server is created
+		grpc_prometheus.Register(server)
+
 		go server.Serve(i.listener)
 		<-ctx.Done()
 		i.listener.Close()

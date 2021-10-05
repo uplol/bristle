@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 )
 
@@ -39,6 +40,10 @@ func (d *debugServer) Run() {
 		runtime.SetMutexProfileFraction(*d.config.MutexProfileFraction)
 	} else {
 		runtime.SetMutexProfileFraction(0)
+	}
+
+	if d.config.Metrics {
+		http.Handle("/metrics", promhttp.Handler())
 	}
 
 	errChan := make(chan error)
