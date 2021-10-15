@@ -71,7 +71,9 @@ func (s *Server) reloadConfig(newConfig *Config) error {
 	messageBindingRegistry.BindFromClusters(clusters, protoRegistry)
 
 	if newConfig.Autobind {
-		messageBindingRegistry.BindFromProtos(clusters, protoRegistry)
+		if err := messageBindingRegistry.BindFromProtos(clusters, protoRegistry); err != nil {
+			return err
+		}
 	}
 
 	writerGroup := newWriterGroup()
