@@ -66,10 +66,10 @@ func (c *ClickhouseCluster) GetTable(fullTableName FullTableName) (*ClickhouseTa
 	}
 
 	conn, err := c.GetConn()
+	defer c.ReleaseConn(conn)
 	if err != nil {
 		return nil, err
 	}
-	defer c.ReleaseConn(conn)
 
 	columnRows, err := conn.Query(
 		`SELECT name, position, type, default_expression FROM system.columns WHERE database = ? AND table = ? ORDER BY position`,

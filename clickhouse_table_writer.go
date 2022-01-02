@@ -114,10 +114,10 @@ func (c *ClickhouseTableWriter) run(done chan struct{}) {
 
 func (c *ClickhouseTableWriter) writeBatch(batch [][]interface{}) error {
 	conn, err := c.table.cluster.GetConn()
+	defer c.table.cluster.ReleaseConn(conn)
 	if err != nil {
 		return err
 	}
-	defer c.table.cluster.ReleaseConn(conn)
 
 	tx, err := conn.Begin()
 	if err != nil {
